@@ -1,107 +1,107 @@
-# Digital Pharma System - Directory Structure
+# Digital Pharma System - Complete Directory Structure
 
 ```
-C:\Users\Toshiba Satellite\dps\
+digital-pharma-system/
 │
-├── 📁 app/
-│   ├── 📁 Console/
-│   │   └── 📁 Commands/
-│   │       ├── MigrateFromMySQL.php       # MySQL to MongoDB migration
-│   │       └── TestMongo.php               # MongoDB connection test
+├── app/
+│   ├── Console/
+│   │   ├── Commands/
+│   │   │   ├── MigrateFromMySQL.php
+│   │   │   └── TestMongo.php
+│   │   └── Kernel.php
 │   │
-│   ├── 📁 Http/
-│   │   ├── 📁 Controllers/
+│   ├── Http/
+│   │   ├── Controllers/
+│   │   │   ├── Api/
+│   │   │   │   ├── ConversationController.php
+│   │   │   │   ├── CustomerController.php
+│   │   │   │   ├── DashboardController.php
+│   │   │   │   ├── NotificationController.php
+│   │   │   │   ├── OrderController.php
+│   │   │   │   ├── PrescriptionController.php
+│   │   │   │   ├── ProductController.php
+│   │   │   │   └── ReportController.php
 │   │   │   │
-│   │   │   ├── 📁 Api/
-│   │   │   │   ├── ConversationController.php  # Chat system
-│   │   │   │   ├── CustomerController.php      # Customer management
-│   │   │   │   ├── DashboardController.php     # Dashboard API
-│   │   │   │   ├── NotificationController.php  # Notifications
-│   │   │   │   ├── OrderController.php         # Order processing
-│   │   │   │   ├── PrescriptionController.php  # Prescription handling
-│   │   │   │   ├── ProductController.php       # Product & inventory
-│   │   │   │   └── ReportController.php        # Reports (empty)
-│   │   │   │
-│   │   │   ├── 📁 Auth/
-│   │   │   │   ├── AdminAuthController.php              # Admin login/logout
-│   │   │   │   ├── AuthenticatedSessionController.php   # User sessions
-│   │   │   │   ├── ConfirmablePasswordController.php    # Password confirmation
-│   │   │   │   ├── CustomerAuthController.php           # Customer auth
+│   │   │   ├── Auth/
+│   │   │   │   ├── AdminAuthController.php
+│   │   │   │   ├── AuthenticatedSessionController.php
+│   │   │   │   ├── ConfirmablePasswordController.php
+│   │   │   │   ├── CustomerAuthController.php
 │   │   │   │   ├── EmailVerificationNotificationController.php
 │   │   │   │   ├── EmailVerificationPromptController.php
-│   │   │   │   ├── NewPasswordController.php            # Password reset
-│   │   │   │   ├── PasswordController.php               # Password update
-│   │   │   │   ├── PasswordResetLinkController.php      # Reset link
-│   │   │   │   ├── RegisteredUserController.php         # Registration
-│   │   │   │   └── VerifyEmailController.php            # Email verification
+│   │   │   │   ├── NewPasswordController.php
+│   │   │   │   ├── PasswordController.php
+│   │   │   │   ├── PasswordResetLinkController.php
+│   │   │   │   ├── RegisteredUserController.php
+│   │   │   │   └── VerifyEmailController.php
 │   │   │   │
-│   │   │   ├── Controller.php                  # Base controller
-│   │   │   └── ProfileController.php           # User profile
+│   │   │   ├── Controller.php
+│   │   │   └── ProfileController.php
 │   │   │
-│   │   ├── 📁 Middleware/
-│   │   │   ├── AdminMiddleware.php             # Admin access guard
-│   │   │   └── HandleInertiaRequests.php       # Inertia.js middleware
+│   │   ├── Middleware/
+│   │   │   ├── AdminMiddleware.php
+│   │   │   ├── HandleInertiaRequests.php
+│   │   │   └── ... (default Laravel middleware)
 │   │   │
-│   │   └── 📁 Requests/
-│   │       ├── 📁 Auth/
-│   │       │   └── LoginRequest.php            # Login validation
-│   │       └── ProfileUpdateRequest.php        # Profile validation
+│   │   └── Requests/
+│   │       ├── Auth/
+│   │       │   └── LoginRequest.php
+│   │       └── ProfileUpdateRequest.php
 │   │
-│   ├── 📁 Models/
-│   │   ├── Category.php                # Product categories
-│   │   ├── Conversation.php            # Chat conversations
-│   │   ├── Notification.php            # Notification system
-│   │   ├── Order.php                   # Customer orders
-│   │   ├── POSTransaction.php          # Point of Sale
-│   │   ├── Prescription.php            # Prescription uploads
-│   │   ├── Product.php                 # Products with batches (FIFO)
-│   │   ├── StockMovement.php           # Inventory audit trail
-│   │   ├── Supplier.php                # Supplier management
-│   │   └── User.php                    # Users (admin/staff/customer)
+│   ├── Models/
+│   │   ├── Category.php
+│   │   ├── Conversation.php
+│   │   ├── Notification.php
+│   │   ├── Order.php
+│   │   ├── POSTransaction.php
+│   │   ├── Prescription.php
+│   │   ├── Product.php
+│   │   ├── StockMovement.php
+│   │   ├── Supplier.php
+│   │   └── User.php
 │   │
-│   └── 📁 Providers/
-│       └── AppServiceProvider.php      # Service provider
+│   └── Providers/
+│       └── AppServiceProvider.php
 │
-├── 📁 bootstrap/
-│   ├── 📁 cache/
-│   │   └── .gitignore
-│   ├── app.php                         # Application bootstrap
-│   └── providers.php                   # Provider registration
+├── bootstrap/
+│   ├── app.php
+│   ├── cache/
+│   └── providers.php
 │
-├── 📁 config/
-│   ├── app.php                         # Application config
-│   ├── auth.php                        # Authentication
-│   ├── cache.php                       # Cache configuration
-│   ├── database.php                    # MongoDB & MySQL connections
-│   ├── filesystems.php                 # File storage (prescriptions, QR)
-│   ├── logging.php                     # Logging configuration
-│   ├── mail.php                        # Email configuration
-│   ├── queue.php                       # Queue configuration
-│   ├── services.php                    # Third-party services
-│   └── session.php                     # Session management
+├── config/
+│   ├── app.php
+│   ├── auth.php
+│   ├── cache.php
+│   ├── database.php
+│   ├── filesystems.php
+│   ├── logging.php
+│   ├── mail.php
+│   ├── queue.php
+│   ├── services.php
+│   └── session.php
 │
-├── 📁 database/
-│   ├── 📁 factories/
+├── database/
+│   ├── factories/
 │   │   └── UserFactory.php
-│   ├── 📁 migrations/
+│   ├── migrations/
 │   │   ├── 0001_01_01_000000_create_users_table.php
 │   │   ├── 0001_01_01_000001_create_cache_table.php
 │   │   └── 0001_01_01_000002_create_jobs_table.php
-│   └── 📁 seeders/
+│   └── seeders/
 │       └── DatabaseSeeder.php
 │
-├── 📁 public/
-│   ├── .htaccess                       # Apache rewrite rules
+├── public/
+│   ├── .htaccess
 │   ├── favicon.ico
-│   ├── index.php                       # Application entry point
+│   ├── index.php
 │   └── robots.txt
 │
-├── 📁 resources/
-│   ├── 📁 css/
-│   │   └── app.css                     # Tailwind CSS
+├── resources/
+│   ├── css/
+│   │   └── app.css
 │   │
-│   ├── 📁 js/
-│   │   ├── 📁 Components/              # Reusable React components
+│   ├── js/
+│   │   ├── Components/
 │   │   │   ├── ApplicationLogo.jsx
 │   │   │   ├── Checkbox.jsx
 │   │   │   ├── DangerButton.jsx
@@ -115,61 +115,63 @@ C:\Users\Toshiba Satellite\dps\
 │   │   │   ├── SecondaryButton.jsx
 │   │   │   └── TextInput.jsx
 │   │   │
-│   │   ├── 📁 Layouts/
-│   │   │   ├── AuthenticatedLayout.jsx  # Logged-in user layout
-│   │   │   └── GuestLayout.jsx          # Public pages layout
+│   │   ├── Layouts/
+│   │   │   ├── AuthenticatedLayout.jsx
+│   │   │   └── GuestLayout.jsx
 │   │   │
-│   │   ├── 📁 Pages/
-│   │   │   ├── 📁 Auth/                 # Authentication pages
-│   │   │   │   ├── AdminLogin.jsx       # 🔥 Admin login (beautiful UI)
+│   │   ├── Pages/
+│   │   │   ├── Admin/
+│   │   │   │   └── Dashboard.jsx
+│   │   │   │
+│   │   │   ├── Auth/
+│   │   │   │   ├── AdminLogin.jsx
 │   │   │   │   ├── ConfirmPassword.jsx
 │   │   │   │   ├── ForgotPassword.jsx
-│   │   │   │   ├── Login.jsx            # Customer login
+│   │   │   │   ├── Login.jsx
 │   │   │   │   ├── Register.jsx
 │   │   │   │   ├── ResetPassword.jsx
 │   │   │   │   └── VerifyEmail.jsx
 │   │   │   │
-│   │   │   ├── 📁 Profile/              # User profile
+│   │   │   ├── Profile/
 │   │   │   │   ├── Edit.jsx
-│   │   │   │   └── 📁 Partials/
+│   │   │   │   └── Partials/
 │   │   │   │       ├── DeleteUserForm.jsx
 │   │   │   │       ├── UpdatePasswordForm.jsx
 │   │   │   │       └── UpdateProfileInformationForm.jsx
 │   │   │   │
-│   │   │   ├── Dashboard.jsx            # Default dashboard
-│   │   │   └── Welcome.jsx              # Landing page
+│   │   │   ├── Dashboard.jsx
+│   │   │   └── Welcome.jsx
 │   │   │
-│   │   ├── app.jsx                      # Inertia.js setup
-│   │   └── bootstrap.js                 # Axios setup
+│   │   ├── app.jsx
+│   │   └── bootstrap.js
 │   │
-│   └── 📁 views/
-│       └── app.blade.php
-│       └──📁client
-│          resources/views/client/login.blade.php - Customer login page
-│          resources/views/client/signup1.blade.php - Registration step 1
-│          resources/views/client/signup2.blade.php - Registration step 2
-│          resources/views/client/home.blade.php - Customer Homepage
-├── 📁 routes/
-│   ├── auth.php                        # Authentication routes
-│   ├── console.php                     # Artisan commands
-│   └── web.php                         # Web routes
+│   └── views/
+│       ├── app.blade.php
+│       └── client/
+│           ├── home.blade.php
+│           ├── login.blade.php
+│           ├── signup1.blade.php
+│           └── signup2.blade.php
 │
-├── 📁 storage/
-│   ├── 📁 app/
-│   │   ├── 📁 private/                 # Encrypted prescriptions
-│   │   └── 📁 public/
-│   │       └── 📁 qrcodes/             # QR codes for prescriptions
-│   ├── 📁 framework/
-│   │   ├── 📁 cache/
-│   │   ├── 📁 sessions/
-│   │   ├── 📁 testing/
-│   │   └── 📁 views/                   # Compiled Blade templates
-│   └── 📁 logs/
-│       └── laravel.log
+├── routes/
+│   ├── auth.php
+│   ├── console.php
+│   └── web.php
 │
-├── 📁 tests/
-│   ├── 📁 Feature/
-│   │   ├── 📁 Auth/
+├── storage/
+│   ├── app/
+│   │   ├── private/
+│   │   └── public/
+│   ├── framework/
+│   │   ├── cache/
+│   │   ├── sessions/
+│   │   ├── testing/
+│   │   └── views/
+│   └── logs/
+│
+├── tests/
+│   ├── Feature/
+│   │   ├── Auth/
 │   │   │   ├── AuthenticationTest.php
 │   │   │   ├── EmailVerificationTest.php
 │   │   │   ├── PasswordConfirmationTest.php
@@ -178,100 +180,55 @@ C:\Users\Toshiba Satellite\dps\
 │   │   │   └── RegistrationTest.php
 │   │   ├── ExampleTest.php
 │   │   └── ProfileTest.php
-│   ├── 📁 Unit/
+│   │
+│   ├── Unit/
 │   │   └── ExampleTest.php
+│   │
 │   └── TestCase.php
 │
-├── .env                                # Environment configuration
-├── .gitignore                          # Git ignore rules
-├── artisan                             # Laravel CLI
-├── composer.json                       # PHP dependencies
-├── package.json                        # Node.js dependencies
-├── tailwind.config.js                  # Tailwind CSS config
-├── vite.config.js                      # Vite build config
-└── README.md                           # Project documentation
+├── .env
+├── .env.example
+├── .gitignore
+├── artisan
+├── composer.json
+├── composer.lock
+├── package.json
+├── package-lock.json
+├── phpunit.xml
+├── tailwind.config.js
+├── vite.config.js
+└── README.md
 ```
 
----
+## Key Directory Explanations
 
-## 📊 Key Architecture Highlights
+### `/app` - Application Core
+- **Console/Commands**: Artisan commands for MongoDB migration and testing
+- **Http/Controllers**: Organized into API, Auth, and general controllers
+- **Models**: MongoDB Eloquent models for all entities
+- **Providers**: Service providers for bootstrapping
 
-### **Backend (Laravel 11 + MongoDB)**
-- **Models**: Full MongoDB integration with embedded batches in Products
-- **Controllers**: Separated by domain (Admin, API, Auth)
-- **Middleware**: Admin access control + Inertia.js handling
-- **Commands**: Migration tools from MySQL to MongoDB
+### `/resources` - Frontend Assets
+- **js/Components**: Reusable React components
+- **js/Layouts**: Layout templates for authenticated and guest users
+- **js/Pages**: Page components organized by feature
+- **views**: Blade templates for customer-facing pages
 
-### **Frontend (React + Inertia.js)**
-- **Pages**: Auth pages (including beautiful AdminLogin)
-- **Components**: Reusable UI elements
-- **Layouts**: Authenticated vs Guest layouts
+### `/routes` - Route Definitions
+- **web.php**: Main routes for both admin and customer portals
+- **auth.php**: Authentication routes
+- **console.php**: Artisan command routes
 
-### **Database (MongoDB)**
-Collections managed through Eloquent models:
-- `users` - Admin/Staff/Customers (unified)
-- `products` - With embedded `batches` array (FIFO inventory)
-- `prescriptions` - File uploads with OCR & duplicate detection
-- `orders` - Customer orders
-- `pos_transactions` - Walk-in sales
-- `conversations` - Chat system with embedded messages
-- `notifications` - Real-time alerts
-- `stock_movements` - Audit trail
+### `/config` - Configuration Files
+- **database.php**: MongoDB and MySQL connection settings
+- **auth.php**: Authentication guards and providers
+- **filesystems.php**: Storage disk configurations
 
-### **Storage**
-- `storage/app/private/` - Encrypted prescription files
-- `storage/app/public/qrcodes/` - QR codes for tracking
-- `storage/logs/` - Application logs
+### `/storage` - File Storage
+- **app/private**: Prescription files (encrypted)
+- **app/public**: Public assets (QR codes, product images)
+- **logs**: Application logs
 
----
-
-## 🎯 Next Steps to Complete
-
-### **Missing Files to Create:**
-
-1. **Admin Routes** (create: `routes/admin.php`)
-2. **Admin Middleware** (already shown in artifacts)
-3. **Admin Dashboard Page** (create: `resources/js/Pages/Admin/Dashboard.jsx`)
-4. **API Routes** (add to `routes/web.php` or create `routes/api.php`)
-
-### **To Run the System:**
-
-```bash
-# Install dependencies
-composer install
-npm install
-
-# Generate app key
-php artisan key:generate
-
-# Run migrations (MongoDB)
-php artisan migrate
-
-# Create admin user
-php artisan tinker
-> User::create([
-    'email' => 'mjspharmacy@gmail.com',
-    'password' => bcrypt('dpharmasmdb'),
-    'role' => 'admin',
-    'name' => 'System Administrator',
-    'status' => 'active',
-  ]);
-
-# Build assets
-npm run dev
-
-# Start server
-php artisan serve
-```
-
----
-
-## 🔐 Access Points
-
-- **Admin Login**: `http://localhost:8000/admin/login`
-- **Customer Login**: `http://localhost:8000/login`
-- **Landing Page**: `http://localhost:8000/`
-
----
-
-**System Status**: ✅ 90% Complete - Ready for admin routes and dashboard implementation
+### `/tests` - Test Suite
+- **Feature**: Integration tests
+- **Unit**: Unit tests

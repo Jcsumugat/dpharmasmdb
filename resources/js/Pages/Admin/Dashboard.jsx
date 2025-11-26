@@ -1,150 +1,473 @@
-import { Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Head, router } from '@inertiajs/react';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
-export default function Dashboard({ auth }) {
+export default function Dashboard({ stats }) {
+    const [period, setPeriod] = useState('today');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handlePeriodChange = (newPeriod) => {
+        setPeriod(newPeriod);
+        setIsLoading(true);
+        router.get(route('admin.dashboard'), { period: newPeriod }, {
+            preserveState: true,
+            preserveScroll: true,
+            onFinish: () => setIsLoading(false)
+        });
+    };
+
+    const formatCurrency = (amount) => {
+        return '₱' + Number(amount || 0).toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    };
+
+    const formatPercentage = (value) => {
+        const num = Number(value || 0);
+        const sign = num > 0 ? '+' : '';
+        return `${sign}${num.toFixed(2)}%`;
+    };
+
+    const getChangeColor = (value) => {
+        const num = Number(value || 0);
+        if (num > 0) return '#10b981';
+        if (num < 0) return '#ef4444';
+        return '#64748b';
+    };
+
+    const getChangeIcon = (value) => {
+        const num = Number(value || 0);
+        if (num > 0) return '↑';
+        if (num < 0) return '↓';
+        return '→';
+    };
+
     return (
-        <>
-            <Head title="Admin Dashboard" />
+        <AuthenticatedLayout>
+            <Head title="Dashboard" />
 
-            <div className="min-h-screen bg-gray-100">
+            <div className="dashboard-container">
                 {/* Header */}
-                <header className="bg-white shadow">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">
-                                Admin Dashboard
-                            </h1>
-                            <p className="text-sm text-gray-600 mt-1">
-                                Welcome back, {auth?.user?.name || 'Admin'}
-                            </p>
-                        </div>
-
-                        <Link
-                            href={route('admin.logout')}
-                            method="post"
-                            as="button"
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-                        >
-                            Logout
-                        </Link>
-                    </div>
-                </header>
-
-                {/* Main Content */}
-                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        {/* Total Orders */}
-                        <div className="bg-white rounded-lg shadow p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-gray-600 font-medium">Total Orders</p>
-                                    <p className="text-3xl font-bold text-gray-900 mt-2">0</p>
-                                </div>
-                                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Total Products */}
-                        <div className="bg-white rounded-lg shadow p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-gray-600 font-medium">Total Products</p>
-                                    <p className="text-3xl font-bold text-gray-900 mt-2">0</p>
-                                </div>
-                                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Total Customers */}
-                        <div className="bg-white rounded-lg shadow p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-gray-600 font-medium">Total Customers</p>
-                                    <p className="text-3xl font-bold text-gray-900 mt-2">0</p>
-                                </div>
-                                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Pending Prescriptions */}
-                        <div className="bg-white rounded-lg shadow p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-gray-600 font-medium">Pending Prescriptions</p>
-                                    <p className="text-3xl font-bold text-gray-900 mt-2">0</p>
-                                </div>
-                                <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                </div>
-                            </div>
+                <div className="page-header">
+                    <div className="header-content">
+                        <h1 className="page-title">Dashboard</h1>
+                        <div className="period-selector">
+                            {['today', 'week', 'month', 'year'].map((p) => (
+                                <button
+                                    key={p}
+                                    className={`period-btn ${period === p ? 'active' : ''}`}
+                                    onClick={() => handlePeriodChange(p)}
+                                    disabled={isLoading}
+                                >
+                                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                                </button>
+                            ))}
                         </div>
                     </div>
+                </div>
 
-                    {/* Quick Actions */}
-                    <div className="bg-white rounded-lg shadow p-6 mb-8">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <button className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition text-center">
-                                <svg className="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                                <p className="text-sm font-medium text-gray-700">Add Product</p>
-                            </button>
+                {/* Overview Stats */}
+                <div className="stats-section">
+                    <h2 className="section-title">Overview</h2>
+                    <div className="stats-grid">
+                        <StatCard
+                            icon="💰"
+                            label="Total Revenue"
+                            value={formatCurrency(stats.overview.total_revenue.value)}
+                            change={stats.overview.total_revenue.change}
+                            changeLabel="vs previous period"
+                        />
+                        <StatCard
+                            icon="🛒"
+                            label="Total Orders"
+                            value={stats.overview.total_orders.value}
+                            change={stats.overview.total_orders.change}
+                            changeLabel="vs previous period"
+                        />
+                        <StatCard
+                            icon="👥"
+                            label="Total Customers"
+                            value={stats.overview.total_customers}
+                        />
+                        <StatCard
+                            icon="📝"
+                            label="Pending Prescriptions"
+                            value={stats.overview.pending_prescriptions}
+                            highlight={stats.overview.pending_prescriptions > 0}
+                        />
+                    </div>
+                </div>
 
-                            <button className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition text-center">
-                                <svg className="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                </svg>
-                                <p className="text-sm font-medium text-gray-700">View Orders</p>
-                            </button>
+                {/* Revenue Breakdown */}
+                <div className="stats-section">
+                    <h2 className="section-title">Revenue Breakdown</h2>
+                    <div className="stats-grid-3">
+                        <StatCard
+                            icon="🌐"
+                            label="Online Revenue"
+                            value={formatCurrency(stats.revenue.online)}
+                            color="#3b82f6"
+                        />
+                        <StatCard
+                            icon="🏪"
+                            label="POS Revenue"
+                            value={formatCurrency(stats.revenue.pos)}
+                            color="#8b5cf6"
+                        />
+                        <StatCard
+                            icon="💵"
+                            label="Total Revenue"
+                            value={formatCurrency(stats.revenue.total)}
+                            color="#10b981"
+                        />
+                    </div>
+                </div>
 
-                            <button className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition text-center">
-                                <svg className="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                                <p className="text-sm font-medium text-gray-700">Manage Users</p>
-                            </button>
-
-                            <button className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition text-center">
-                                <svg className="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                </svg>
-                                <p className="text-sm font-medium text-gray-700">View Reports</p>
-                            </button>
+                {/* Orders & Products */}
+                <div className="two-col-grid">
+                    {/* Order Stats */}
+                    <div className="card">
+                        <h2 className="card-title">Orders Status</h2>
+                        <div className="list-stats">
+                            <ListStat label="Pending" value={stats.orders.pending} color="#f59e0b" />
+                            <ListStat label="Processing" value={stats.orders.processing} color="#3b82f6" />
+                            <ListStat label="Shipped" value={stats.orders.shipped} color="#8b5cf6" />
+                            <ListStat label="Delivered" value={stats.orders.delivered} color="#10b981" />
+                            <ListStat label="Cancelled" value={stats.orders.cancelled} color="#ef4444" />
+                            <div className="list-stat-total">
+                                <span>Total Orders</span>
+                                <strong>{stats.orders.total}</strong>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Success Message */}
-                    <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg">
-                        <div className="flex items-center">
-                            <svg className="w-6 h-6 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <div>
-                                <p className="font-medium text-green-800">Login Successful! 🎉</p>
-                                <p className="text-sm text-green-700 mt-1">
-                                    You are now logged in to the Digital Pharma System admin panel.
-                                </p>
+                    {/* Product Stats */}
+                    <div className="card">
+                        <h2 className="card-title">Product Inventory</h2>
+                        <div className="list-stats">
+                            <ListStat label="Total Products" value={stats.products.total} color="#3b82f6" />
+                            <ListStat label="Low Stock" value={stats.products.low_stock} color="#f59e0b" />
+                            <ListStat label="Out of Stock" value={stats.products.out_of_stock} color="#ef4444" />
+                            <ListStat label="Expiring Soon" value={stats.products.expiring_soon} color="#f59e0b" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Customers & Prescriptions */}
+                <div className="two-col-grid">
+                    {/* Customer Stats */}
+                    <div className="card">
+                        <h2 className="card-title">Customers</h2>
+                        <div className="list-stats">
+                            <ListStat label="Total Customers" value={stats.customers.total} color="#3b82f6" />
+                            <ListStat label="New Customers" value={stats.customers.new} color="#10b981" />
+                            <ListStat label="Active Customers" value={stats.customers.active} color="#8b5cf6" />
+                        </div>
+                    </div>
+
+                    {/* Prescription Stats */}
+                    <div className="card">
+                        <h2 className="card-title">Prescriptions</h2>
+                        <div className="list-stats">
+                            <ListStat label="Pending" value={stats.prescriptions.pending} color="#f59e0b" />
+                            <ListStat label="Verified" value={stats.prescriptions.verified} color="#10b981" />
+                            <ListStat label="Rejected" value={stats.prescriptions.rejected} color="#ef4444" />
+                            <div className="list-stat-total">
+                                <span>Total Prescriptions</span>
+                                <strong>{stats.prescriptions.total}</strong>
                             </div>
                         </div>
                     </div>
-                </main>
+                </div>
             </div>
-        </>
+
+            <style jsx>{`
+                .dashboard-container {
+                    padding: 2rem;
+                    max-width: 1400px;
+                    margin: 0 auto;
+                }
+
+                .page-header {
+                    margin-bottom: 2rem;
+                }
+
+                .header-content {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    padding: 2rem;
+                    border-radius: 16px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: 1rem;
+                    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.25);
+                }
+
+                .page-title {
+                    font-size: 2rem;
+                    font-weight: 800;
+                    color: white;
+                    margin: 0;
+                }
+
+                .period-selector {
+                    display: flex;
+                    gap: 0.5rem;
+                    background: rgba(255, 255, 255, 0.1);
+                    padding: 0.5rem;
+                    border-radius: 12px;
+                }
+
+                .period-btn {
+                    padding: 0.5rem 1rem;
+                    border: none;
+                    background: transparent;
+                    color: rgba(255, 255, 255, 0.8);
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    transition: all 0.2s;
+                }
+
+                .period-btn:hover:not(:disabled) {
+                    background: rgba(255, 255, 255, 0.15);
+                    color: white;
+                }
+
+                .period-btn.active {
+                    background: white;
+                    color: #667eea;
+                }
+
+                .period-btn:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+
+                .stats-section {
+                    margin-bottom: 2rem;
+                }
+
+                .section-title {
+                    font-size: 1.25rem;
+                    font-weight: 600;
+                    color: #1e293b;
+                    margin: 0 0 1rem 0;
+                }
+
+                .stats-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                    gap: 1.5rem;
+                }
+
+                .stats-grid-3 {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    gap: 1.5rem;
+                }
+
+                .two-col-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                    gap: 1.5rem;
+                    margin-bottom: 2rem;
+                }
+
+                .card {
+                    background: white;
+                    padding: 1.5rem;
+                    border-radius: 12px;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                    border: 1px solid #e2e8f0;
+                }
+
+                .card-title {
+                    font-size: 1.125rem;
+                    font-weight: 600;
+                    color: #1e293b;
+                    margin: 0 0 1rem 0;
+                }
+
+                .list-stats {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                }
+
+                .list-stat-total {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 0.75rem 0;
+                    border-top: 2px solid #e2e8f0;
+                    margin-top: 0.5rem;
+                    font-weight: 600;
+                    color: #1e293b;
+                }
+
+                @media (max-width: 768px) {
+                    .dashboard-container {
+                        padding: 1rem;
+                    }
+
+                    .header-content {
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+
+                    .period-selector {
+                        width: 100%;
+                        overflow-x: auto;
+                    }
+                }
+            `}</style>
+        </AuthenticatedLayout>
+    );
+}
+
+function StatCard({ icon, label, value, change, changeLabel, highlight, color }) {
+    const formatPercentage = (val) => {
+        const num = Number(val || 0);
+        const sign = num > 0 ? '+' : '';
+        return `${sign}${num.toFixed(2)}%`;
+    };
+
+    const getChangeColor = (val) => {
+        const num = Number(val || 0);
+        if (num > 0) return '#10b981';
+        if (num < 0) return '#ef4444';
+        return '#64748b';
+    };
+
+    const getChangeIcon = (val) => {
+        const num = Number(val || 0);
+        if (num > 0) return '↑';
+        if (num < 0) return '↓';
+        return '→';
+    };
+
+    return (
+        <div className={`stat-card ${highlight ? 'highlight' : ''}`}>
+            <div className="stat-icon" style={{ color: color || '#667eea' }}>
+                {icon}
+            </div>
+            <div className="stat-content">
+                <p className="stat-label">{label}</p>
+                <h3 className="stat-value">{value}</h3>
+                {change !== undefined && (
+                    <div className="stat-change" style={{ color: getChangeColor(change) }}>
+                        <span className="change-icon">{getChangeIcon(change)}</span>
+                        <span className="change-value">{formatPercentage(change)}</span>
+                        {changeLabel && <span className="change-label">{changeLabel}</span>}
+                    </div>
+                )}
+            </div>
+
+            <style jsx>{`
+                .stat-card {
+                    background: white;
+                    padding: 1.5rem;
+                    border-radius: 12px;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                    border: 1px solid #e2e8f0;
+                    display: flex;
+                    gap: 1rem;
+                    transition: all 0.2s;
+                }
+
+                .stat-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                }
+
+                .stat-card.highlight {
+                    border-color: #f59e0b;
+                    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+                }
+
+                .stat-icon {
+                    font-size: 2.5rem;
+                    display: flex;
+                    align-items: center;
+                }
+
+                .stat-content {
+                    flex: 1;
+                }
+
+                .stat-label {
+                    font-size: 0.875rem;
+                    color: #64748b;
+                    margin: 0 0 0.25rem 0;
+                    font-weight: 500;
+                }
+
+                .stat-value {
+                    font-size: 1.75rem;
+                    font-weight: 700;
+                    color: #1e293b;
+                    margin: 0 0 0.5rem 0;
+                }
+
+                .stat-change {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                    font-size: 0.875rem;
+                    font-weight: 600;
+                }
+
+                .change-icon {
+                    font-size: 1rem;
+                }
+
+                .change-label {
+                    color: #64748b;
+                    font-weight: 400;
+                    margin-left: 0.25rem;
+                }
+            `}</style>
+        </div>
+    );
+}
+
+function ListStat({ label, value, color }) {
+    return (
+        <div className="list-stat">
+            <div className="list-stat-indicator" style={{ backgroundColor: color }} />
+            <span className="list-stat-label">{label}</span>
+            <span className="list-stat-value">{value}</span>
+
+            <style jsx>{`
+                .list-stat {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    padding: 0.5rem 0;
+                }
+
+                .list-stat-indicator {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    flex-shrink: 0;
+                }
+
+                .list-stat-label {
+                    flex: 1;
+                    color: #64748b;
+                    font-size: 0.875rem;
+                }
+
+                .list-stat-value {
+                    font-weight: 600;
+                    color: #1e293b;
+                    font-size: 1rem;
+                }
+            `}</style>
+        </div>
     );
 }
