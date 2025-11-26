@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -16,7 +16,7 @@ class AdminAuthController extends Controller
      */
     public function showLogin()
     {
-        return Inertia::render('Admin/Login');
+        return Inertia::render('Auth/AdminLogin');
     }
 
     /**

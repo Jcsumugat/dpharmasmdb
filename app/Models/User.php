@@ -50,41 +50,9 @@ class User extends Authenticatable
         'updated_at' => 'datetime',
     ];
 
-    // Role checking methods
-    public function isAdmin(): bool
-    {
-        return $this->role === self::ROLE_ADMIN;
-    }
-
-    public function isStaff(): bool
-    {
-        return $this->role === self::ROLE_STAFF;
-    }
-
-    public function isCustomer(): bool
-    {
-        return $this->role === self::ROLE_CUSTOMER;
-    }
-
     public function hasRole(string $role): bool
     {
         return $this->role === $role;
-    }
-
-    // Status checking
-    public function isActive(): bool
-    {
-        return $this->status === 'active';
-    }
-
-    public function isRestricted(): bool
-    {
-        return $this->status === 'restricted';
-    }
-
-    public function isDeactivated(): bool
-    {
-        return $this->status === 'deactivated';
     }
 
     // Relationships
@@ -163,5 +131,60 @@ class User extends Authenticatable
     public function scopeRestricted($query)
     {
         return $query->where('status', 'restricted');
+    }
+    /**
+     * Check if user is a customer
+     */
+    public function isCustomer(): bool
+    {
+        return $this->role === self::ROLE_CUSTOMER;
+    }
+
+    /**
+     * Check if user is admin
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
+    }
+
+    /**
+     * Check if user is staff
+     */
+    public function isStaff(): bool
+    {
+        return $this->role === self::ROLE_STAFF;
+    }
+
+    /**
+     * Check if user account is active
+     */
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
+
+    /**
+     * Check if user account is deactivated
+     */
+    public function isDeactivated(): bool
+    {
+        return $this->status === 'deactivated';
+    }
+
+    /**
+     * Check if user account is restricted
+     */
+    public function isRestricted(): bool
+    {
+        return $this->status === 'restricted';
+    }
+
+    /**
+     * Check if user account is deleted
+     */
+    public function isDeleted(): bool
+    {
+        return $this->status === 'deleted';
     }
 }
