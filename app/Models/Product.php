@@ -41,7 +41,7 @@ class Product extends Model
         'reorder_level' => 'integer',
         'unit_quantity' => 'float',
         'notification_sent_at' => 'datetime',
-        'batches' => 'array',
+
     ];
 
     // Classification constants

@@ -40,7 +40,6 @@ class User extends Authenticatable
     ];
 
     protected $casts = [
-        'address' => 'array',
         'birthdate' => 'datetime',
         'status_changed_at' => 'datetime',
         'auto_restore_at' => 'datetime',

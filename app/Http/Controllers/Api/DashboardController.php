@@ -1,318 +1,279 @@
 <?php
+// FILE: app/Http/Controllers/Api/DashboardController.php
+// REPLACE EVERYTHING with MongoDB-compatible queries
 
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Order;
-use App\Models\Product;
+use Inertia\Inertia;
 use App\Models\User;
+use App\Models\Product;
+use App\Models\Order;
+use App\Models\PosTransaction;
 use App\Models\Prescription;
-use App\Models\POSTransaction;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
     /**
-     * Get dashboard statistics for admin
+     * Display the admin dashboard
      */
-    public function getStats(Request $request)
+    public function index()
     {
-        try {
-            $period = $request->input('period', 'today'); // today, week, month, year
+        $period = request('period', 'today');
 
-            $stats = [
-                'overview' => $this->getOverviewStats($period),
-                'revenue' => $this->getRevenueStats($period),
-                'orders' => $this->getOrderStats($period),
-                'products' => $this->getProductStats(),
-                'customers' => $this->getCustomerStats($period),
-                'prescriptions' => $this->getPrescriptionStats($period),
-            ];
-
-            return response()->json([
-                'success' => true,
-                'data' => $stats
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch dashboard stats',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Get recent activity for dashboard
-     */
-    public function getRecentActivity(Request $request)
-    {
-        try {
-            $limit = $request->input('limit', 10);
-
-            $recentOrders = Order::with('user:_id,name,email')
-                ->orderBy('created_at', 'desc')
-                ->limit($limit)
-                ->get()
-                ->map(function ($order) {
-                    return [
-                        'id' => $order->_id,
-                        'type' => 'order',
-                        'customer' => $order->user->name ?? 'Unknown',
-                        'status' => $order->status,
-                        'amount' => $order->total_amount,
-                        'created_at' => $order->created_at,
-                    ];
-                });
-
-            $recentPrescriptions = Prescription::with('user:_id,name,email')
-                ->orderBy('created_at', 'desc')
-                ->limit($limit)
-                ->get()
-                ->map(function ($prescription) {
-                    return [
-                        'id' => $prescription->_id,
-                        'type' => 'prescription',
-                        'customer' => $prescription->user->name ?? 'Unknown',
-                        'status' => $prescription->status,
-                        'created_at' => $prescription->created_at,
-                    ];
-                });
-
-            // Merge and sort by created_at
-            $activities = $recentOrders->concat($recentPrescriptions)
-                ->sortByDesc('created_at')
-                ->take($limit)
-                ->values();
-
-            return response()->json([
-                'success' => true,
-                'data' => $activities
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch recent activity',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Get overview statistics
-     */
-    private function getOverviewStats($period)
-    {
+        // Get date ranges
         $dateRange = $this->getDateRange($period);
+        $previousDateRange = $this->getPreviousDateRange($period);
 
-        $totalRevenue = Order::whereBetween('created_at', $dateRange)
-            ->whereIn('status', ['completed', 'delivered'])
-            ->sum('total_amount');
-
-        $totalOrders = Order::whereBetween('created_at', $dateRange)->count();
-
-        $totalCustomers = User::where('role', User::ROLE_CUSTOMER)
-            ->whereBetween('created_at', $dateRange)
-            ->count();
-
-        $pendingPrescriptions = Prescription::where('status', 'pending')
-            ->whereBetween('created_at', $dateRange)
-            ->count();
-
-        // Calculate percentage changes (compare with previous period)
-        $previousRange = $this->getPreviousDateRange($period);
-
-        $previousRevenue = Order::whereBetween('created_at', $previousRange)
-            ->whereIn('status', ['completed', 'delivered'])
-            ->sum('total_amount');
-
-        $previousOrders = Order::whereBetween('created_at', $previousRange)->count();
-
-        return [
-            'total_revenue' => [
-                'value' => $totalRevenue,
-                'change' => $this->calculatePercentageChange($totalRevenue, $previousRevenue)
+        // Calculate stats
+        $stats = [
+            'overview' => [
+                'total_revenue' => [
+                    'value' => $this->getTotalRevenue($dateRange),
+                    'change' => $this->getRevenueChange($dateRange, $previousDateRange),
+                ],
+                'total_orders' => [
+                    'value' => $this->getTotalOrders($dateRange),
+                    'change' => $this->getOrdersChange($dateRange, $previousDateRange),
+                ],
+                'total_customers' => User::where('role', User::ROLE_CUSTOMER)->count(),
+                'pending_prescriptions' => Prescription::where('status', 'pending')->count(),
             ],
-            'total_orders' => [
-                'value' => $totalOrders,
-                'change' => $this->calculatePercentageChange($totalOrders, $previousOrders)
+            'revenue' => [
+                'online' => $this->getOnlineRevenue($dateRange),
+                'pos' => $this->getPOSRevenue($dateRange),
+                'total' => $this->getTotalRevenue($dateRange),
             ],
-            'total_customers' => $totalCustomers,
-            'pending_prescriptions' => $pendingPrescriptions,
+            'orders' => [
+                'pending' => Order::where('status', 'pending')->count(),
+                'processing' => Order::where('status', 'approved')->count(),
+                'shipped' => 0,
+                'delivered' => Order::where('status', 'completed')->count(),
+                'cancelled' => Order::where('status', 'cancelled')->count(),
+                'total' => Order::count(),
+            ],
+            'products' => [
+                'total' => Product::count(),
+                'low_stock' => $this->getLowStockCount(),
+                'out_of_stock' => Product::where('stock_quantity', 0)->count(),
+                'expiring_soon' => $this->getExpiringSoonCount(),
+            ],
+            'customers' => [
+                'total' => User::where('role', User::ROLE_CUSTOMER)->count(),
+                'new' => User::where('role', User::ROLE_CUSTOMER)
+                    ->whereBetween('created_at', $dateRange)
+                    ->count(),
+                'active' => User::where('role', User::ROLE_CUSTOMER)
+                    ->where('status', 'active')
+                    ->count(),
+            ],
+            'prescriptions' => [
+                'pending' => Prescription::where('status', 'pending')->count(),
+                'verified' => Prescription::where('status', 'approved')->count(),
+                'rejected' => Prescription::where('status', 'declined')->count(),
+                'total' => Prescription::count(),
+            ],
         ];
+
+        return Inertia::render('Admin/Dashboard', [
+            'stats' => $stats,
+        ]);
     }
 
     /**
-     * Get revenue statistics
+     * Get stats via API (for AJAX calls)
      */
-    private function getRevenueStats($period)
+    public function getStats()
     {
+        $period = request('period', 'today');
         $dateRange = $this->getDateRange($period);
+        $previousDateRange = $this->getPreviousDateRange($period);
 
-        $onlineRevenue = Order::whereBetween('created_at', $dateRange)
-            ->whereIn('status', ['completed', 'delivered'])
-            ->sum('total_amount');
+        return response()->json([
+            'overview' => [
+                'total_revenue' => [
+                    'value' => $this->getTotalRevenue($dateRange),
+                    'change' => $this->getRevenueChange($dateRange, $previousDateRange),
+                ],
+                'total_orders' => [
+                    'value' => $this->getTotalOrders($dateRange),
+                    'change' => $this->getOrdersChange($dateRange, $previousDateRange),
+                ],
+                'total_customers' => User::where('role', User::ROLE_CUSTOMER)->count(),
+                'pending_prescriptions' => Prescription::where('status', 'pending')->count(),
+            ],
+        ]);
+    }
 
-        $posRevenue = POSTransaction::whereBetween('created_at', $dateRange)
+    /**
+     * Get recent activity
+     */
+    public function getRecentActivity()
+    {
+        $recentOrders = Order::with('customer')
+            ->latest()
+            ->take(5)
+            ->get();
+
+        $recentPrescriptions = Prescription::with('customer')
+            ->latest()
+            ->take(5)
+            ->get();
+
+        return response()->json([
+            'recent_orders' => $recentOrders,
+            'recent_prescriptions' => $recentPrescriptions,
+        ]);
+    }
+
+    // Private helper methods
+    private function getDateRange($period)
+    {
+        $now = Carbon::now();
+
+        switch ($period) {
+            case 'today':
+                return [$now->copy()->startOfDay(), $now->copy()->endOfDay()];
+            case 'week':
+                return [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()];
+            case 'month':
+                return [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()];
+            case 'year':
+                return [$now->copy()->startOfYear(), $now->copy()->endOfYear()];
+            default:
+                return [$now->copy()->startOfDay(), $now->copy()->endOfDay()];
+        }
+    }
+
+    private function getPreviousDateRange($period)
+    {
+        $now = Carbon::now();
+
+        switch ($period) {
+            case 'today':
+                return [$now->copy()->subDay()->startOfDay(), $now->copy()->subDay()->endOfDay()];
+            case 'week':
+                return [$now->copy()->subWeek()->startOfWeek(), $now->copy()->subWeek()->endOfWeek()];
+            case 'month':
+                return [$now->copy()->subMonth()->startOfMonth(), $now->copy()->subMonth()->endOfMonth()];
+            case 'year':
+                return [$now->copy()->subYear()->startOfYear(), $now->copy()->subYear()->endOfYear()];
+            default:
+                return [$now->copy()->subDay()->startOfDay(), $now->copy()->subDay()->endOfDay()];
+        }
+    }
+
+    private function getTotalRevenue($dateRange)
+    {
+        $posRevenue = PosTransaction::whereBetween('created_at', $dateRange)
             ->where('status', 'completed')
             ->sum('total_amount');
 
-        return [
-            'online' => $onlineRevenue,
-            'pos' => $posRevenue,
-            'total' => $onlineRevenue + $posRevenue,
-        ];
+        $orderRevenue = Order::whereBetween('created_at', $dateRange)
+            ->where('status', 'completed')
+            ->sum('total_amount');
+
+        return $posRevenue + $orderRevenue;
     }
 
-    /**
-     * Get order statistics
-     */
-    private function getOrderStats($period)
+    private function getOnlineRevenue($dateRange)
     {
-        $dateRange = $this->getDateRange($period);
-
-        $orders = Order::whereBetween('created_at', $dateRange)->get();
-
-        return [
-            'pending' => $orders->where('status', 'pending')->count(),
-            'processing' => $orders->where('status', 'processing')->count(),
-            'shipped' => $orders->where('status', 'shipped')->count(),
-            'delivered' => $orders->where('status', 'delivered')->count(),
-            'cancelled' => $orders->where('status', 'cancelled')->count(),
-            'total' => $orders->count(),
-        ];
+        return Order::whereBetween('created_at', $dateRange)
+            ->where('status', 'completed')
+            ->sum('total_amount');
     }
 
-    /**
-     * Get product statistics
-     */
-    private function getProductStats()
+    private function getPOSRevenue($dateRange)
     {
-        $totalProducts = Product::where('status', 'active')->count();
-
-        $lowStockProducts = Product::where('status', 'active')
-            ->where(function ($query) {
-                $query->whereRaw('quantity <= low_stock_threshold');
-            })
-            ->count();
-
-        $outOfStockProducts = Product::where('status', 'active')
-            ->where('quantity', 0)
-            ->count();
-
-        $expiringSoon = Product::where('status', 'active')
-            ->where('batches.expiry_date', '<=', Carbon::now()->addMonths(3))
-            ->count();
-
-        return [
-            'total' => $totalProducts,
-            'low_stock' => $lowStockProducts,
-            'out_of_stock' => $outOfStockProducts,
-            'expiring_soon' => $expiringSoon,
-        ];
+        return PosTransaction::whereBetween('created_at', $dateRange)
+            ->where('status', 'completed')
+            ->sum('total_amount');
     }
 
-    /**
-     * Get customer statistics
-     */
-    private function getCustomerStats($period)
+    private function getTotalOrders($dateRange)
     {
-        $dateRange = $this->getDateRange($period);
-
-        $totalCustomers = User::where('role', User::ROLE_CUSTOMER)->count();
-
-        $newCustomers = User::where('role', User::ROLE_CUSTOMER)
-            ->whereBetween('created_at', $dateRange)
-            ->count();
-
-        $activeCustomers = User::where('role', User::ROLE_CUSTOMER)
-            ->where('status', 'active')
-            ->count();
-
-        return [
-            'total' => $totalCustomers,
-            'new' => $newCustomers,
-            'active' => $activeCustomers,
-        ];
+        return Order::whereBetween('created_at', $dateRange)->count();
     }
 
-    /**
-     * Get prescription statistics
-     */
-    private function getPrescriptionStats($period)
+    private function getRevenueChange($currentRange, $previousRange)
     {
-        $dateRange = $this->getDateRange($period);
+        $current = $this->getTotalRevenue($currentRange);
+        $previous = $this->getTotalRevenue($previousRange);
 
-        $prescriptions = Prescription::whereBetween('created_at', $dateRange)->get();
-
-        return [
-            'pending' => $prescriptions->where('status', 'pending')->count(),
-            'verified' => $prescriptions->where('status', 'verified')->count(),
-            'rejected' => $prescriptions->where('status', 'rejected')->count(),
-            'total' => $prescriptions->count(),
-        ];
-    }
-
-    /**
-     * Get date range based on period
-     */
-    private function getDateRange($period)
-    {
-        switch ($period) {
-            case 'today':
-                return [Carbon::today(), Carbon::now()];
-            case 'week':
-                return [Carbon::now()->startOfWeek(), Carbon::now()];
-            case 'month':
-                return [Carbon::now()->startOfMonth(), Carbon::now()];
-            case 'year':
-                return [Carbon::now()->startOfYear(), Carbon::now()];
-            default:
-                return [Carbon::today(), Carbon::now()];
-        }
-    }
-
-    /**
-     * Get previous period date range
-     */
-    private function getPreviousDateRange($period)
-    {
-        switch ($period) {
-            case 'today':
-                return [Carbon::yesterday()->startOfDay(), Carbon::yesterday()->endOfDay()];
-            case 'week':
-                return [
-                    Carbon::now()->subWeek()->startOfWeek(),
-                    Carbon::now()->subWeek()->endOfWeek()
-                ];
-            case 'month':
-                return [
-                    Carbon::now()->subMonth()->startOfMonth(),
-                    Carbon::now()->subMonth()->endOfMonth()
-                ];
-            case 'year':
-                return [
-                    Carbon::now()->subYear()->startOfYear(),
-                    Carbon::now()->subYear()->endOfYear()
-                ];
-            default:
-                return [Carbon::yesterday()->startOfDay(), Carbon::yesterday()->endOfDay()];
-        }
-    }
-
-    /**
-     * Calculate percentage change
-     */
-    private function calculatePercentageChange($current, $previous)
-    {
         if ($previous == 0) {
             return $current > 0 ? 100 : 0;
         }
 
-        return round((($current - $previous) / $previous) * 100, 2);
+        return (($current - $previous) / $previous) * 100;
+    }
+
+    private function getOrdersChange($currentRange, $previousRange)
+    {
+        $current = $this->getTotalOrders($currentRange);
+        $previous = $this->getTotalOrders($previousRange);
+
+        if ($previous == 0) {
+            return $current > 0 ? 100 : 0;
+        }
+
+        return (($current - $previous) / $previous) * 100;
+    }
+
+    /**
+     * MongoDB-compatible low stock count
+     * Can't use whereRaw with MongoDB, need to iterate
+     */
+    private function getLowStockCount()
+    {
+        $count = 0;
+        $products = Product::where('stock_quantity', '>', 0)->get();
+
+        foreach ($products as $product) {
+            if ($product->stock_quantity <= $product->reorder_level) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * MongoDB-compatible expiring soon count
+     */
+    private function getExpiringSoonCount()
+    {
+        $count = 0;
+        $thirtyDaysFromNow = Carbon::now()->addDays(30);
+
+        $products = Product::all();
+
+        foreach ($products as $product) {
+            if (!isset($product->batches) || !is_array($product->batches)) {
+                continue;
+            }
+
+            foreach ($product->batches as $batch) {
+                if (!isset($batch['expiration_date']) || !isset($batch['quantity_remaining'])) {
+                    continue;
+                }
+
+                try {
+                    $expiryDate = Carbon::parse($batch['expiration_date']);
+
+                    if ($expiryDate->lte($thirtyDaysFromNow) &&
+                        $expiryDate->gt(Carbon::now()) &&
+                        $batch['quantity_remaining'] > 0) {
+                        $count++;
+                        break; // Count product once even if multiple batches are expiring
+                    }
+                } catch (\Exception $e) {
+                    // Skip invalid dates
+                    continue;
+                }
+            }
+        }
+
+        return $count;
     }
 }
