@@ -1,7 +1,6 @@
 # Digital Pharma System - Complete Directory Structure
 
-```
-digital-pharma-system/
+dps/
 │
 ├── app/
 │   ├── Console/
@@ -116,12 +115,30 @@ digital-pharma-system/
 │   │   │   └── TextInput.jsx
 │   │   │
 │   │   ├── Layouts/
-│   │   │   ├── AuthenticatedLayout.jsx
+│   │   │   ├── AuthenticatedLayout.jsx  ← UPDATED (Professional pharmacy design)
 │   │   │   └── GuestLayout.jsx
 │   │   │
 │   │   ├── Pages/
 │   │   │   ├── Admin/
-│   │   │   │   └── Dashboard.jsx
+│   │   │   │   ├── Conversations/
+│   │   │   │   │   └── Index.jsx  ← NEW
+│   │   │   │   │
+│   │   │   │   ├── Customers/
+│   │   │   │   │   └── Index.jsx  ← NEW
+│   │   │   │   │
+│   │   │   │   ├── Orders/
+│   │   │   │   │   └── Index.jsx  ← NEW
+│   │   │   │   │
+│   │   │   │   ├── Prescriptions/
+│   │   │   │   │   └── Index.jsx  ← NEW
+│   │   │   │   │
+│   │   │   │   ├── Products/
+│   │   │   │   │   └── Index.jsx  ← NEW
+│   │   │   │   │
+│   │   │   │   ├── Reports/
+│   │   │   │   │   └── Index.jsx  ← NEW
+│   │   │   │   │
+│   │   │   │   └── Dashboard.jsx  ← UPDATED (Professional pharmacy design)
 │   │   │   │
 │   │   │   ├── Auth/
 │   │   │   │   ├── AdminLogin.jsx
@@ -156,7 +173,7 @@ digital-pharma-system/
 ├── routes/
 │   ├── auth.php
 │   ├── console.php
-│   └── web.php
+│   └── web.php  ← UPDATED (Added page routes for all navigation items)
 │
 ├── storage/
 │   ├── app/
@@ -198,7 +215,6 @@ digital-pharma-system/
 ├── tailwind.config.js
 ├── vite.config.js
 └── README.md
-```
 
 ## Key Directory Explanations
 
