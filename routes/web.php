@@ -42,6 +42,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Page routes
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+        Route::get('/products/create', function () {
+            return Inertia::render('Admin/Products/Create');
+        })->name('products.create');
+
+        Route::get('/products', function () {
+            return Inertia::render('Admin/Products/Index');
+        })->name('products');
+
         Route::get('/products', function () {
             return Inertia::render('Admin/Products/Index');
         })->name('products');
@@ -74,6 +82,22 @@ Route::prefix('admin')->name('admin.')->group(function () {
             // Dashboard
             Route::get('/dashboard/stats', [DashboardController::class, 'getStats'])->name('dashboard.stats');
             Route::get('/dashboard/recent-activity', [DashboardController::class, 'getRecentActivity'])->name('dashboard.activity');
+
+            // Categories
+            Route::get('/categories', function () {
+                return response()->json([
+                    'success' => true,
+                    'categories' => []
+                ]);
+            })->name('categories.index');
+
+            // Suppliers
+            Route::get('/suppliers', function () {
+                return response()->json([
+                    'success' => true,
+                    'suppliers' => []
+                ]);
+            })->name('suppliers.index');
 
             // Products
             Route::apiResource('products', ProductController::class);
@@ -144,6 +168,7 @@ Route::prefix('customer')->name('customer.')->group(function () {
 
         // API routes
         Route::prefix('api')->name('api.')->group(function () {
+
 
             // Products
             Route::get('/products', [ProductController::class, 'index'])->name('products.index');

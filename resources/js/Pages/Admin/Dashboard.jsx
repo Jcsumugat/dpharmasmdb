@@ -356,7 +356,7 @@ export default function Dashboard({ stats }) {
                     border: 1px solid #E5E7EB;
                 }
 
-          .card-content {
+                .card-content {
                     padding: 1.5rem 1.75rem;
                     display: flex;
                     flex-direction: column;
