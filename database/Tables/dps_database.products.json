@@ -1,0 +1,716 @@
+[{
+  "_id": {
+    "$oid": "692558d833ae19973f0930e0"
+  },
+  "product_code": "5989",
+  "product_name": "Paracetamol",
+  "generic_name": null,
+  "brand_name": "Biogesic",
+  "manufacturer": "Mercury Drug",
+  "product_type": "OTC",
+  "form_type": "Tablet",
+  "dosage_unit": "500mg",
+  "classification": "2",
+  "category_id": {
+    "$oid": "692558d833ae19973f0930d2"
+  },
+  "supplier_id": {
+    "$oid": "692558d833ae19973f0930d8"
+  },
+  "stock_quantity": 362,
+  "reorder_level": 50,
+  "unit": "piece",
+  "unit_quantity": 1,
+  "batches": [
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930e1"
+      },
+      "batch_number": "598-20250825-001",
+      "expiration_date": {
+        "$date": "2026-09-09T00:00:00.000Z"
+      },
+      "quantity_received": 500,
+      "quantity_remaining": 362,
+      "unit_cost": 4,
+      "sale_price": 6,
+      "received_date": {
+        "$date": "2025-09-03T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d8"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-08-25T20:15:56.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-10-08T22:17:34.000Z"
+      }
+    }
+  ],
+  "notification_sent_at": null,
+  "storage_requirements": "Room Temperature",
+  "created_at": {
+    "$date": "2025-08-25T19:59:37.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-10-08T22:17:34.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "692558d833ae19973f0930e2"
+  },
+  "product_code": "5971",
+  "product_name": "Amoxicillin",
+  "generic_name": null,
+  "brand_name": "Amoxicillin",
+  "manufacturer": "Pfizer Inc.",
+  "product_type": "Prescription",
+  "form_type": "Capsule",
+  "dosage_unit": "500mg",
+  "classification": "1",
+  "category_id": {
+    "$oid": "692558d833ae19973f0930d2"
+  },
+  "supplier_id": {
+    "$oid": "692558d833ae19973f0930d8"
+  },
+  "stock_quantity": 295,
+  "reorder_level": 50,
+  "unit": "piece",
+  "unit_quantity": 1,
+  "batches": [
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930e3"
+      },
+      "batch_number": "597-20250904-001",
+      "expiration_date": {
+        "$date": "2027-09-07T00:00:00.000Z"
+      },
+      "quantity_received": 320,
+      "quantity_remaining": 110,
+      "unit_cost": 5,
+      "sale_price": 7,
+      "received_date": {
+        "$date": "2025-10-02T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d8"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-09-04T13:32:06.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-10-09T00:24:16.000Z"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930e4"
+      },
+      "batch_number": "597-20250911-001",
+      "expiration_date": {
+        "$date": "2025-09-12T00:00:00.000Z"
+      },
+      "quantity_received": 40,
+      "quantity_remaining": 0,
+      "unit_cost": 4,
+      "sale_price": 5,
+      "received_date": {
+        "$date": "2025-09-11T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d8"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-09-11T16:59:02.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-09-11T16:59:02.000Z"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930e5"
+      },
+      "batch_number": "597-20250924-001",
+      "expiration_date": {
+        "$date": "2025-09-25T00:00:00.000Z"
+      },
+      "quantity_received": 14,
+      "quantity_remaining": 0,
+      "unit_cost": 4,
+      "sale_price": 4,
+      "received_date": {
+        "$date": "2025-09-24T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d8"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-09-24T15:55:35.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-09-24T15:55:35.000Z"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930e6"
+      },
+      "batch_number": "597-20250925-001",
+      "expiration_date": {
+        "$date": "2025-09-26T00:00:00.000Z"
+      },
+      "quantity_received": 10,
+      "quantity_remaining": 0,
+      "unit_cost": 4,
+      "sale_price": 6,
+      "received_date": {
+        "$date": "2025-09-25T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d8"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-09-25T10:53:13.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-09-25T10:55:44.000Z"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930e7"
+      },
+      "batch_number": "AMO251009001",
+      "expiration_date": {
+        "$date": "2027-09-09T00:00:00.000Z"
+      },
+      "quantity_received": 100,
+      "quantity_remaining": 100,
+      "unit_cost": 4,
+      "sale_price": 6,
+      "received_date": {
+        "$date": "2025-10-08T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d8"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-10-09T00:25:03.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-10-09T00:25:03.000Z"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930e8"
+      },
+      "batch_number": "AMO251009002",
+      "expiration_date": {
+        "$date": "2027-06-06T00:00:00.000Z"
+      },
+      "quantity_received": 100,
+      "quantity_remaining": 85,
+      "unit_cost": 5,
+      "sale_price": 7,
+      "received_date": {
+        "$date": "2025-10-08T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d8"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-10-09T00:26:00.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-10-11T11:26:51.000Z"
+      }
+    }
+  ],
+  "notification_sent_at": null,
+  "storage_requirements": null,
+  "created_at": {
+    "$date": "2025-09-04T13:05:25.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-10-11T11:26:52.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "692558d833ae19973f0930e9"
+  },
+  "product_code": "8918",
+  "product_name": "Ibuprofen",
+  "generic_name": null,
+  "brand_name": "Ibufrofen",
+  "manufacturer": "GlaxoSmithKline",
+  "product_type": "OTC",
+  "form_type": "Tablet",
+  "dosage_unit": "200mg",
+  "classification": "2",
+  "category_id": {
+    "$oid": "692558d833ae19973f0930d2"
+  },
+  "supplier_id": {
+    "$oid": "692558d833ae19973f0930d7"
+  },
+  "stock_quantity": 164,
+  "reorder_level": 50,
+  "unit": "piece",
+  "unit_quantity": 1,
+  "batches": [
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930ea"
+      },
+      "batch_number": "891-20250904-001",
+      "expiration_date": {
+        "$date": "2026-09-09T00:00:00.000Z"
+      },
+      "quantity_received": 200,
+      "quantity_remaining": 164,
+      "unit_cost": 4,
+      "sale_price": 6,
+      "received_date": {
+        "$date": "2025-09-04T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d7"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-09-04T13:31:43.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-09-25T11:13:29.000Z"
+      }
+    }
+  ],
+  "notification_sent_at": null,
+  "storage_requirements": "Room Temperature",
+  "created_at": {
+    "$date": "2025-09-04T13:11:33.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-09-25T11:13:29.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "692558d833ae19973f0930eb"
+  },
+  "product_code": "4098",
+  "product_name": "Ascorbic Acid",
+  "generic_name": null,
+  "brand_name": "RiteMed",
+  "manufacturer": "Zuellig Pharma",
+  "product_type": "OTC",
+  "form_type": "Syrup",
+  "dosage_unit": "500mg/5ml",
+  "classification": "5",
+  "category_id": {
+    "$oid": "692558d833ae19973f0930d2"
+  },
+  "supplier_id": {
+    "$oid": "692558d833ae19973f0930d7"
+  },
+  "stock_quantity": 60,
+  "reorder_level": 50,
+  "unit": "piece",
+  "unit_quantity": 1,
+  "batches": [
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930ec"
+      },
+      "batch_number": "409-20250915-001",
+      "expiration_date": {
+        "$date": "2027-09-09T00:00:00.000Z"
+      },
+      "quantity_received": 40,
+      "quantity_remaining": 20,
+      "unit_cost": 15,
+      "sale_price": 17,
+      "received_date": {
+        "$date": "2025-09-15T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d7"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-09-15T17:35:31.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-09-25T13:08:28.000Z"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930ed"
+      },
+      "batch_number": "409-20250925-001",
+      "expiration_date": {
+        "$date": "2027-09-09T00:00:00.000Z"
+      },
+      "quantity_received": 40,
+      "quantity_remaining": 40,
+      "unit_cost": 4,
+      "sale_price": 6,
+      "received_date": {
+        "$date": "2025-09-25T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d7"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-09-25T13:06:30.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-09-25T13:06:30.000Z"
+      }
+    }
+  ],
+  "notification_sent_at": null,
+  "storage_requirements": "Room Temperature",
+  "created_at": {
+    "$date": "2025-09-15T17:34:31.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-09-25T13:08:28.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "692558d833ae19973f0930ee"
+  },
+  "product_code": "8374",
+  "product_name": "Cetirizen",
+  "generic_name": null,
+  "brand_name": "ritemed",
+  "manufacturer": "Other",
+  "product_type": "OTC",
+  "form_type": "Tablet",
+  "dosage_unit": "10mg",
+  "classification": "1",
+  "category_id": {
+    "$oid": "692558d833ae19973f0930d2"
+  },
+  "supplier_id": {
+    "$oid": "692558d833ae19973f0930d8"
+  },
+  "stock_quantity": 180,
+  "reorder_level": 50,
+  "unit": "piece",
+  "unit_quantity": 1,
+  "batches": [
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930ef"
+      },
+      "batch_number": "837-20250925-001",
+      "expiration_date": {
+        "$date": "2027-09-09T00:00:00.000Z"
+      },
+      "quantity_received": 200,
+      "quantity_remaining": 180,
+      "unit_cost": 4,
+      "sale_price": 5,
+      "received_date": {
+        "$date": "2025-09-25T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d8"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-09-25T10:16:48.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-10-08T22:17:34.000Z"
+      }
+    }
+  ],
+  "notification_sent_at": null,
+  "storage_requirements": null,
+  "created_at": {
+    "$date": "2025-09-25T10:16:12.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-10-08T22:17:34.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "692558d833ae19973f0930f0"
+  },
+  "product_code": "3685",
+  "product_name": "Paracetamol",
+  "generic_name": null,
+  "brand_name": "RiteMed",
+  "manufacturer": "Other",
+  "product_type": "OTC",
+  "form_type": "Tablet",
+  "dosage_unit": "500mg",
+  "classification": "2",
+  "category_id": {
+    "$oid": "692558d833ae19973f0930d2"
+  },
+  "supplier_id": {
+    "$oid": "692558d833ae19973f0930d8"
+  },
+  "stock_quantity": 0,
+  "reorder_level": 100,
+  "unit": "piece",
+  "unit_quantity": 1,
+  "batches": [],
+  "notification_sent_at": null,
+  "storage_requirements": "Room Temperature",
+  "created_at": {
+    "$date": "2025-09-25T13:15:29.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-09-25T13:15:29.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "692558d833ae19973f0930f1"
+  },
+  "product_code": "1546",
+  "product_name": "Kremil-S",
+  "generic_name": "Aspirin",
+  "brand_name": null,
+  "manufacturer": "Pfizer Inc.",
+  "product_type": "OTC",
+  "form_type": "Capsule",
+  "dosage_unit": "250mg",
+  "classification": "5",
+  "category_id": {
+    "$oid": "692558d833ae19973f0930d2"
+  },
+  "supplier_id": {
+    "$oid": "692558d833ae19973f0930d8"
+  },
+  "stock_quantity": 960,
+  "reorder_level": 100,
+  "unit": "box",
+  "unit_quantity": 120,
+  "batches": [
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930f2"
+      },
+      "batch_number": "KRE251007001",
+      "expiration_date": {
+        "$date": "2027-09-09T00:00:00.000Z"
+      },
+      "quantity_received": 960,
+      "quantity_remaining": 960,
+      "unit_cost": 10,
+      "sale_price": 12,
+      "received_date": {
+        "$date": "2025-10-07T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d8"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-10-07T13:25:31.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-10-07T13:25:31.000Z"
+      }
+    }
+  ],
+  "notification_sent_at": null,
+  "storage_requirements": "Room Temperature",
+  "created_at": {
+    "$date": "2025-10-06T21:26:02.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-10-06T21:26:02.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "692558d833ae19973f0930f3"
+  },
+  "product_code": "7193",
+  "product_name": "Kremil-S",
+  "generic_name": null,
+  "brand_name": null,
+  "manufacturer": "Pfizer Inc.",
+  "product_type": "OTC",
+  "form_type": "Capsule",
+  "dosage_unit": "250mg",
+  "classification": "5",
+  "category_id": {
+    "$oid": "692558d833ae19973f0930d2"
+  },
+  "supplier_id": {
+    "$oid": "692558d833ae19973f0930d8"
+  },
+  "stock_quantity": 0,
+  "reorder_level": 100,
+  "unit": "box",
+  "unit_quantity": 120,
+  "batches": [],
+  "notification_sent_at": null,
+  "storage_requirements": "Room Temperature",
+  "created_at": {
+    "$date": "2025-10-06T21:48:57.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-10-06T21:48:57.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "692558d833ae19973f0930f4"
+  },
+  "product_code": "8889",
+  "product_name": "Paracetamol",
+  "generic_name": null,
+  "brand_name": null,
+  "manufacturer": "Mercury Drug",
+  "product_type": "OTC",
+  "form_type": "Tablet",
+  "dosage_unit": "250mg",
+  "classification": "2",
+  "category_id": {
+    "$oid": "692558d833ae19973f0930d2"
+  },
+  "supplier_id": {
+    "$oid": "692558d833ae19973f0930d7"
+  },
+  "stock_quantity": 240,
+  "reorder_level": 100,
+  "unit": "box",
+  "unit_quantity": 120,
+  "batches": [
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930f5"
+      },
+      "batch_number": "PAR251008001",
+      "expiration_date": {
+        "$date": "2027-09-09T00:00:00.000Z"
+      },
+      "quantity_received": 240,
+      "quantity_remaining": 240,
+      "unit_cost": 4,
+      "sale_price": 6,
+      "received_date": {
+        "$date": "2025-10-08T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d7"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-10-08T22:43:50.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-10-08T22:43:50.000Z"
+      }
+    }
+  ],
+  "notification_sent_at": null,
+  "storage_requirements": "Room Temperature",
+  "created_at": {
+    "$date": "2025-10-06T21:53:12.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-10-06T21:53:12.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "692558d833ae19973f0930f6"
+  },
+  "product_code": "9382",
+  "product_name": "Loperamide",
+  "generic_name": null,
+  "brand_name": null,
+  "manufacturer": "Johnson & Johnson",
+  "product_type": "OTC",
+  "form_type": "Capsule",
+  "dosage_unit": "500mg",
+  "classification": "11",
+  "category_id": {
+    "$oid": "692558d833ae19973f0930d2"
+  },
+  "supplier_id": {
+    "$oid": "692558d833ae19973f0930d8"
+  },
+  "stock_quantity": 120,
+  "reorder_level": 50,
+  "unit": "box",
+  "unit_quantity": 60,
+  "batches": [
+    {
+      "_id": {
+        "$oid": "692558d833ae19973f0930f7"
+      },
+      "batch_number": "LOP251118001",
+      "expiration_date": {
+        "$date": "2025-11-19T00:00:00.000Z"
+      },
+      "quantity_received": 120,
+      "quantity_remaining": 120,
+      "unit_cost": 20,
+      "sale_price": 23,
+      "received_date": {
+        "$date": "2025-11-18T00:00:00.000Z"
+      },
+      "supplier_id": {
+        "$oid": "692558d833ae19973f0930d8"
+      },
+      "notes": null,
+      "expiration_notification_sent_at": null,
+      "created_at": {
+        "$date": "2025-11-18T16:00:11.000Z"
+      },
+      "updated_at": {
+        "$date": "2025-11-18T16:00:11.000Z"
+      }
+    }
+  ],
+  "notification_sent_at": null,
+  "storage_requirements": "Room Temperature",
+  "created_at": {
+    "$date": "2025-11-18T15:58:17.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-11-18T15:58:17.000Z"
+  }
+}]

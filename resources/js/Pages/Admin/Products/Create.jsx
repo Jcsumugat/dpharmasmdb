@@ -16,7 +16,8 @@ export default function CreateProduct() {
         manufacturer: '',
         product_type: 'OTC',
         form_type: 'Tablet',
-        dosage_unit: '',
+        dosage_strength: '',
+        dosage_unit: 'mg',
         classification: '1',
         category_id: '',
         supplier_id: '',
@@ -30,6 +31,15 @@ export default function CreateProduct() {
         fetchCategories();
         fetchSuppliers();
     }, []);
+
+    useEffect(() => {
+        updateUnitQuantityLabel();
+        updateUnitPreview();
+    }, [formData.unit, formData.unit_quantity, formData.form_type]);
+
+    useEffect(() => {
+        updateDosagePreview();
+    }, [formData.dosage_strength, formData.dosage_unit]);
 
     const fetchCategories = async () => {
         try {
@@ -61,7 +71,6 @@ export default function CreateProduct() {
             ...prev,
             [name]: value
         }));
-        // Clear error for this field
         if (errors[name]) {
             setErrors(prev => ({
                 ...prev,
@@ -77,8 +86,8 @@ export default function CreateProduct() {
             newErrors.product_name = 'Product name is required';
         }
 
-        if (!formData.dosage_unit.trim()) {
-            newErrors.dosage_unit = 'Dosage unit is required';
+        if (!formData.dosage_strength.trim() && !formData.dosage_unit) {
+            newErrors.dosage_unit = 'Dosage strength or unit is required';
         }
 
         if (parseFloat(formData.unit_quantity) <= 0) {
@@ -103,22 +112,27 @@ export default function CreateProduct() {
         setLoading(true);
 
         try {
+            const submitData = {
+                ...formData,
+                dosage_unit: formData.dosage_strength && formData.dosage_unit
+                    ? `${formData.dosage_strength}${formData.dosage_unit}`
+                    : (formData.dosage_unit || formData.dosage_strength)
+            };
+
             const response = await fetch('/admin/api/products', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(submitData)
             });
 
             const data = await response.json();
 
             if (data.success) {
-                // Redirect back to products list
                 router.visit('/admin/products', {
                     onSuccess: () => {
-                        // Show success message (you can implement a toast notification)
                         alert('Product created successfully!');
                     }
                 });
@@ -137,37 +151,311 @@ export default function CreateProduct() {
         router.visit('/admin/products');
     };
 
+    const updateUnitQuantityLabel = () => {
+        // This will be used to display dynamic label text
+    };
+
+    const updateUnitPreview = () => {
+        // This will be used to display preview text
+    };
+
+    const updateDosagePreview = () => {
+        // This will be used to update dosage preview
+    };
+
+    const getUnitQuantityLabel = () => {
+        const unitDisplayMap = {
+            'bottle': 'bottle',
+            'vial': 'vial',
+            'ampoule': 'ampoule',
+            'dropper_bottle': 'dropper bottle',
+            'nebule': 'nebule',
+            'blister_pack': 'blister pack',
+            'box': 'box',
+            'strip': 'strip',
+            'sachet': 'sachet',
+            'syringe': 'pre-filled syringe',
+            'tube': 'tube',
+            'jar': 'jar',
+            'topical_bottle': 'bottle',
+            'inhaler': 'inhaler',
+            'patch': 'patch',
+            'suppository': 'suppository',
+            'piece': 'piece',
+            'pack': 'pack'
+        };
+
+        const containerUnits = ['bottle', 'vial', 'ampoule', 'dropper_bottle', 'nebule', 'tube', 'jar', 'topical_bottle', 'syringe'];
+        const multiItemUnits = ['blister_pack', 'strip', 'box', 'pack', 'sachet'];
+
+        const selectedUnit = formData.unit;
+        const unitDisplay = unitDisplayMap[selectedUnit] || selectedUnit;
+
+        if (!selectedUnit) {
+            return 'Contents per Package';
+        }
+
+        if (containerUnits.includes(selectedUnit)) {
+            return `Volume/Size per ${unitDisplay}`;
+        } else if (selectedUnit === 'box') {
+            return 'Total pieces per box';
+        } else if (multiItemUnits.includes(selectedUnit)) {
+            return `Items per ${unitDisplay}`;
+        } else {
+            return 'Quantity per Unit';
+        }
+    };
+
+    const getUnitQuantityHelp = () => {
+        const containerUnits = ['bottle', 'vial', 'ampoule', 'dropper_bottle', 'nebule', 'tube', 'jar', 'topical_bottle', 'syringe'];
+        const selectedUnit = formData.unit;
+
+        if (!selectedUnit) {
+            return 'Select packaging unit first';
+        }
+
+        if (containerUnits.includes(selectedUnit)) {
+            return 'Enter the volume in mL (e.g., 60 for a 60mL bottle)';
+        } else if (selectedUnit === 'box') {
+            return 'Enter TOTAL pieces in the box. Example: Box with 10 blister packs × 12 tablets = enter 120';
+        } else if (['blister_pack', 'strip', 'pack', 'sachet'].includes(selectedUnit)) {
+            return `How many pieces per ${selectedUnit}? (e.g., 10 tablets per blister)`;
+        } else {
+            return 'Usually 1 for individual items';
+        }
+    };
+
+    const getUnitPreview = () => {
+        const unitDisplayMap = {
+            'bottle': 'bottle',
+            'vial': 'vial',
+            'ampoule': 'ampoule',
+            'dropper_bottle': 'dropper bottle',
+            'nebule': 'nebule',
+            'blister_pack': 'blister pack',
+            'box': 'box',
+            'strip': 'strip',
+            'sachet': 'sachet',
+            'syringe': 'pre-filled syringe',
+            'tube': 'tube',
+            'jar': 'jar',
+            'topical_bottle': 'bottle',
+            'inhaler': 'inhaler',
+            'patch': 'patch',
+            'suppository': 'suppository',
+            'piece': 'piece',
+            'pack': 'pack'
+        };
+
+        const containerUnits = ['bottle', 'vial', 'ampoule', 'dropper_bottle', 'nebule', 'tube', 'jar', 'topical_bottle', 'syringe'];
+        const multiItemUnits = ['blister_pack', 'strip', 'box', 'pack', 'sachet'];
+
+        const selectedUnit = formData.unit;
+        const quantity = parseFloat(formData.unit_quantity) || 0;
+        const formType = formData.form_type;
+        const unitDisplay = unitDisplayMap[selectedUnit] || selectedUnit;
+
+        if (!selectedUnit) {
+            return { text: 'Select packaging unit above', color: '#6c757d' };
+        }
+
+        if (quantity <= 0) {
+            return { text: `Enter quantity for ${unitDisplay}`, color: '#6c757d' };
+        }
+
+        let preview = '';
+
+        if (containerUnits.includes(selectedUnit)) {
+            preview = `Stock counted in: ${unitDisplay}s of ${quantity}mL each`;
+            if (formType) {
+                preview += ` (contains ${formType.toLowerCase()})`;
+            }
+        } else if (multiItemUnits.includes(selectedUnit)) {
+            if (selectedUnit === 'box') {
+                preview = `Stock counted in: boxes of ${quantity} items each`;
+                if (formType) {
+                    preview += ` (${formType.toLowerCase()}s)`;
+                }
+                preview += `\n💡 Tip: If box contains blister packs, enter total pieces per box`;
+            } else {
+                preview = `Stock counted in: ${unitDisplay}s of ${quantity} pieces each`;
+                if (formType) {
+                    preview += ` (${formType.toLowerCase()}s)`;
+                }
+            }
+        } else if (quantity === 1) {
+            preview = `Stock counted per individual ${unitDisplay}`;
+        } else {
+            preview = `Stock counted in: ${unitDisplay}s containing ${quantity} units each`;
+        }
+
+        return { text: preview, color: '#28a745' };
+    };
+
+    const getDosagePreview = () => {
+        const strength = formData.dosage_strength.trim();
+        const unit = formData.dosage_unit;
+
+        if (strength && unit) {
+            return { text: strength + unit, className: 'combined' };
+        } else if (unit) {
+            return { text: unit, className: 'unit-only' };
+        } else if (strength) {
+            return { text: strength + ' (select unit)', className: 'incomplete' };
+        } else {
+            return { text: 'Enter strength and unit above', className: 'empty' };
+        }
+    };
+
     const formTypeOptions = [
-        'Tablet', 'Capsule', 'Syrup', 'Suspension', 'Injection', 'Drops',
-        'Cream', 'Ointment', 'Gel', 'Powder', 'Solution', 'Spray'
+        { group: 'Solid Dosage Forms', options: ['Tablet', 'Capsule', 'Caplet', 'Powder', 'Granules', 'Chewable Tablet', 'Extended Release', 'Enteric Coated'] },
+        { group: 'Liquid Dosage Forms', options: ['Syrup', 'Suspension', 'Solution', 'Elixir', 'Drops', 'Injection', 'IV Solution'] },
+        { group: 'Topical Forms', options: ['Cream', 'Ointment', 'Gel', 'Lotion', 'Patch', 'Foam'] },
+        { group: 'Other Forms', options: ['Inhaler', 'Nasal Spray', 'Eye Drops', 'Suppository'] }
     ];
 
     const classificationOptions = [
         { value: '1', label: 'Class 1 - Antimicrobial' },
-        { value: '2', label: 'Class 2 - Antineoplastic' },
-        { value: '3', label: 'Class 3 - Cardiovascular' },
-        { value: '4', label: 'Class 4 - CNS Agents' },
-        { value: '5', label: 'Class 5 - Dermatological' },
-        { value: '6', label: 'Class 6 - Gastrointestinal' },
-        { value: '7', label: 'Class 7 - Hormones' },
-        { value: '8', label: 'Class 8 - Immunological' },
-        { value: '9', label: 'Class 9 - Ophthalmic' },
+        { value: '2', label: 'Class 2 - Analgesic (Pain relief)' },
+        { value: '3', label: 'Class 3 - Antipyretic (Fever reduction)' },
+        { value: '4', label: 'Class 4 - Anti-inflammatory' },
+        { value: '5', label: 'Class 5 - Antacid' },
+        { value: '6', label: 'Class 6 - Antihistamine' },
+        { value: '7', label: 'Class 7 - Antihypertensive' },
+        { value: '8', label: 'Class 8 - Antidiabetic' },
+        { value: '9', label: 'Class 9 - Cardiovascular' },
         { value: '10', label: 'Class 10 - Respiratory' },
-        { value: '11', label: 'Class 11 - Vitamins/Minerals' },
-        { value: '12', label: 'Class 12 - Other' },
-        { value: '13', label: 'Class 13 - Medical Devices' }
+        { value: '11', label: 'Class 11 - Gastrointestinal' },
+        { value: '12', label: 'Class 12 - Dermatological' },
+        { value: '13', label: 'Class 13 - Neurological' },
+        { value: '14', label: 'Class 14 - Psychiatric' },
+        { value: '15', label: 'Class 15 - Hormonal' },
+        { value: '16', label: 'Class 16 - Vitamin' },
+        { value: '17', label: 'Class 17 - Mineral' },
+        { value: '18', label: 'Class 18 - Immunosuppressant' },
+        { value: '19', label: 'Class 19 - Anticoagulant' },
+        { value: '20', label: 'Class 20 - Antifungal' },
+        { value: '21', label: 'Class 21 - Antiviral' },
+        { value: '22', label: 'Class 22 - Other' }
     ];
+
+    const manufacturerOptions = [
+        'Pfizer Inc.',
+        'Johnson & Johnson',
+        'GlaxoSmithKline',
+        'Novartis AG',
+        'Merck & Co.',
+        'AbbVie Inc.',
+        'Bristol-Myers Squibb',
+        'AstraZeneca',
+        'Sanofi S.A.',
+        'Roche Holding AG',
+        'United Laboratories (Unilab)',
+        'Zuellig Pharma',
+        'Mercury Drug',
+        'Pascual Laboratories',
+        'Hizon Laboratories',
+        'Other'
+    ];
+
+    const productTypeOptions = [
+        'Prescription',
+        'OTC',
+        'Herbal',
+        'Food Supplement',
+        'Vitamins & Minerals',
+        'Medical Device',
+        'Cosmeceutical',
+        'Veterinary'
+    ];
+
+    const storageOptions = [
+        { value: 'Room Temperature', label: 'Room Temperature (15-30°C)' },
+        { value: 'Cool Place', label: 'Cool Place (8-15°C)' },
+        { value: 'Refrigerated', label: 'Refrigerated (2-8°C)' },
+        { value: 'Frozen', label: 'Frozen (-20°C or below)' },
+        { value: 'Protect from Light', label: 'Protect from Light' },
+        { value: 'Dry Place', label: 'Store in Dry Place' },
+        { value: 'Controlled Temperature', label: 'Controlled Room Temperature (20-25°C)' },
+        { value: 'Do Not Freeze', label: 'Do Not Freeze' },
+        { value: 'Store Upright', label: 'Store Upright' },
+        { value: 'Special Handling', label: 'Special Handling Required' }
+    ];
+
+    const unitOptions = [
+        {
+            group: 'Bottled/Container Products', options: [
+                { value: 'bottle', label: 'Bottle (syrup, suspension, liquid)' },
+                { value: 'dropper_bottle', label: 'Dropper Bottle (eye/ear drops)' },
+                { value: 'topical_bottle', label: 'Bottle (lotion, solution)' },
+                { value: 'jar', label: 'Jar (ointment, cream)' },
+                { value: 'tube', label: 'Tube (cream, ointment, gel)' }
+            ]
+        },
+        {
+            group: 'Injectable Products', options: [
+                { value: 'vial', label: 'Vial' },
+                { value: 'ampoule', label: 'Ampoule' },
+                { value: 'syringe', label: 'Pre-filled Syringe' }
+            ]
+        },
+        {
+            group: 'Solid Dose Packaging', options: [
+                { value: 'blister_pack', label: 'Blister Pack' },
+                { value: 'strip', label: 'Strip' },
+                { value: 'box', label: 'Box' },
+                { value: 'sachet', label: 'Sachet' }
+            ]
+        },
+        {
+            group: 'Respiratory', options: [
+                { value: 'nebule', label: 'Nebule' },
+                { value: 'inhaler', label: 'Inhaler' }
+            ]
+        },
+        {
+            group: 'Other', options: [
+                { value: 'patch', label: 'Patch' },
+                { value: 'suppository', label: 'Suppository' },
+                { value: 'piece', label: 'Piece (individual items)' },
+                { value: 'pack', label: 'Pack (multi-item)' }
+            ]
+        }
+    ];
+
+    const dosageUnitOptions = [
+        { value: 'mg', label: 'mg (milligram)' },
+        { value: 'g', label: 'g (gram)' },
+        { value: 'mcg', label: 'mcg (microgram)' },
+        { value: 'IU', label: 'IU (International Unit)' },
+        { value: 'mL', label: 'mL (milliliter)' },
+        { value: 'L', label: 'L (liter)' },
+        { value: '%', label: '% (percentage)' },
+        { value: 'mg/ml', label: 'mg/ml' },
+        { value: 'mg/5ml', label: 'mg/5ml' },
+        { value: 'drops', label: 'drops' },
+        { value: 'ratio', label: 'ratio' }
+    ];
+
+    const genericNamesList = [
+        'Paracetamol', 'Ibuprofen', 'Aspirin', 'Amoxicillin', 'Cetirizine',
+        'Loratadine', 'Metformin', 'Omeprazole', 'Simvastatin', 'Amlodipine',
+        'Losartan', 'Atorvastatin', 'Salbutamol', 'Prednisolone', 'Diclofenac',
+        'Dextromethorphan', 'Chlorpheniramine', 'Phenylephrine', 'Ascorbic Acid', 'Calcium Carbonate'
+    ];
+
+    const unitPreview = getUnitPreview();
+    const dosagePreview = getDosagePreview();
 
     return (
         <AuthenticatedLayout>
             <Head title="Create New Product" />
 
             <div className="create-product-container">
-                {/* Header */}
                 <div className="page-header">
                     <button className="back-button" onClick={handleCancel}>
                         <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
-                            <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                         Back to Products
                     </button>
@@ -177,13 +465,12 @@ export default function CreateProduct() {
                     </div>
                 </div>
 
-                {/* Form */}
                 <div className="product-form">
                     {errors.general && (
                         <div className="error-banner">
                             <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
-                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                                <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                                <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                             </svg>
                             {errors.general}
                         </div>
@@ -213,6 +500,7 @@ export default function CreateProduct() {
                                 {errors.product_name && (
                                     <span className="error-message">{errors.product_name}</span>
                                 )}
+                                <span className="help-text">Enter the complete product name as it appears on packaging</span>
                             </div>
 
                             <div className="form-group">
@@ -243,7 +531,14 @@ export default function CreateProduct() {
                                     onChange={handleChange}
                                     className="form-input"
                                     placeholder="e.g., Paracetamol"
+                                    list="generic_names_list"
                                 />
+                                <datalist id="generic_names_list">
+                                    {genericNamesList.map(name => (
+                                        <option key={name} value={name} />
+                                    ))}
+                                </datalist>
+                                <span className="help-text">Active pharmaceutical ingredient (API) name</span>
                             </div>
 
                             <div className="form-group">
@@ -259,21 +554,25 @@ export default function CreateProduct() {
                                     className="form-input"
                                     placeholder="e.g., Biogesic"
                                 />
+                                <span className="help-text">Commercial brand or trade name (Optional)</span>
                             </div>
 
                             <div className="form-group span-2">
                                 <label htmlFor="manufacturer" className="form-label">
-                                    Manufacturer
+                                    Manufacturer <span className="required">*</span>
                                 </label>
-                                <input
-                                    type="text"
+                                <select
                                     id="manufacturer"
                                     name="manufacturer"
                                     value={formData.manufacturer}
                                     onChange={handleChange}
-                                    className="form-input"
-                                    placeholder="e.g., Unilab"
-                                />
+                                    className="form-select"
+                                >
+                                    <option value="">Select Manufacturer</option>
+                                    {manufacturerOptions.map(mfr => (
+                                        <option key={mfr} value={mfr}>{mfr}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -297,8 +596,10 @@ export default function CreateProduct() {
                                     onChange={handleChange}
                                     className="form-select"
                                 >
-                                    <option value="OTC">💊 Over-the-Counter (OTC)</option>
-                                    <option value="Prescription">📋 Prescription (Rx)</option>
+                                    <option value="">Select Medicine Type</option>
+                                    {productTypeOptions.map(type => (
+                                        <option key={type} value={type}>{type}</option>
+                                    ))}
                                 </select>
                             </div>
 
@@ -313,28 +614,15 @@ export default function CreateProduct() {
                                     onChange={handleChange}
                                     className="form-select"
                                 >
-                                    {formTypeOptions.map(type => (
-                                        <option key={type} value={type}>{type}</option>
+                                    <option value="">Select Dosage Form</option>
+                                    {formTypeOptions.map(group => (
+                                        <optgroup key={group.group} label={group.group}>
+                                            {group.options.map(opt => (
+                                                <option key={opt} value={opt}>{opt}</option>
+                                            ))}
+                                        </optgroup>
                                     ))}
                                 </select>
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="dosage_unit" className="form-label">
-                                    Dosage/Strength <span className="required">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    id="dosage_unit"
-                                    name="dosage_unit"
-                                    value={formData.dosage_unit}
-                                    onChange={handleChange}
-                                    className={`form-input ${errors.dosage_unit ? 'error' : ''}`}
-                                    placeholder="e.g., 500mg, 10ml, 250mg/5ml"
-                                />
-                                {errors.dosage_unit && (
-                                    <span className="error-message">{errors.dosage_unit}</span>
-                                )}
                             </div>
 
                             <div className="form-group">
@@ -376,7 +664,7 @@ export default function CreateProduct() {
                                 </select>
                             </div>
 
-                            <div className="form-group">
+                            <div className="form-group span-2">
                                 <label htmlFor="supplier_id" className="form-label">
                                     Default Supplier
                                 </label>
@@ -398,17 +686,76 @@ export default function CreateProduct() {
                         </div>
                     </div>
 
-                    {/* Inventory Settings */}
+                    {/* Dosage and Formulation */}
                     <div className="form-section">
                         <div className="section-header">
-                            <h2 className="section-title">📦 Inventory Settings</h2>
+                            <h2 className="section-title">💊 Dosage and Formulation</h2>
+                            <p className="section-subtitle">Strength and dosage information</p>
+                        </div>
+
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label htmlFor="dosage_strength" className="form-label">
+                                    Dosage Strength
+                                </label>
+                                <input
+                                    type="text"
+                                    id="dosage_strength"
+                                    name="dosage_strength"
+                                    value={formData.dosage_strength}
+                                    onChange={handleChange}
+                                    className="form-input"
+                                    placeholder="e.g., 500, 250, 10"
+                                />
+                                <span className="help-text">Enter numeric value only</span>
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="dosage_unit" className="form-label">
+                                    Dosage Unit <span className="required">*</span>
+                                </label>
+                                <select
+                                    id="dosage_unit"
+                                    name="dosage_unit"
+                                    value={formData.dosage_unit}
+                                    onChange={handleChange}
+                                    className={`form-select ${errors.dosage_unit ? 'error' : ''}`}
+                                >
+                                    <option value="">Select Unit</option>
+                                    {dosageUnitOptions.map(opt => (
+                                        <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                {errors.dosage_unit && (
+                                    <span className="error-message">{errors.dosage_unit}</span>
+                                )}
+                            </div>
+
+                            <div className="form-group span-2">
+                                <div className="dosage-preview-box">
+                                    <label className="preview-label">Dosage Preview:</label>
+                                    <div className={`preview-content dosage-${dosagePreview.className}`}>
+                                        {dosagePreview.text}
+                                    </div>
+                                </div>
+                                <span className="help-text">e.g., 500mg, 250mg/5mL, 1%, 1:1000</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Packaging & Units */}
+                    <div className="form-section">
+                        <div className="section-header">
+                            <h2 className="section-title">📦 Packaging & Units</h2>
                             <p className="section-subtitle">Stock management parameters</p>
                         </div>
 
                         <div className="form-grid">
                             <div className="form-group">
                                 <label htmlFor="unit" className="form-label">
-                                    Unit <span className="required">*</span>
+                                    Packaging Unit <span className="required">*</span>
                                 </label>
                                 <select
                                     id="unit"
@@ -417,17 +764,23 @@ export default function CreateProduct() {
                                     onChange={handleChange}
                                     className="form-select"
                                 >
-                                    <option value="piece">Piece</option>
-                                    <option value="box">Box</option>
-                                    <option value="bottle">Bottle</option>
-                                    <option value="pack">Pack</option>
-                                    <option value="vial">Vial</option>
+                                    <option value="">Select Packaging Unit</option>
+                                    {unitOptions.map(group => (
+                                        <optgroup key={group.group} label={group.group}>
+                                            {group.options.map(opt => (
+                                                <option key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    ))}
                                 </select>
+                                <span className="help-text">How is this product packaged? This is NOT the dosage form.</span>
                             </div>
 
                             <div className="form-group">
                                 <label htmlFor="unit_quantity" className="form-label">
-                                    Items per Unit <span className="required">*</span>
+                                    {getUnitQuantityLabel()} <span className="required">*</span>
                                 </label>
                                 <input
                                     type="number"
@@ -438,13 +791,63 @@ export default function CreateProduct() {
                                     className={`form-input ${errors.unit_quantity ? 'error' : ''}`}
                                     min="0.01"
                                     step="0.01"
-                                    placeholder="e.g., 1, 10, 100"
+                                    placeholder="e.g., 1, 10, 60, 100"
                                 />
                                 {errors.unit_quantity && (
                                     <span className="error-message">{errors.unit_quantity}</span>
                                 )}
+                                <span className="help-text">{getUnitQuantityHelp()}</span>
                             </div>
 
+                            <div className="form-group span-2">
+                                <div className="unit-preview-box">
+                                    <label className="preview-label">Packaging Preview:</label>
+                                    <div className="preview-content" style={{ color: unitPreview.color }}>
+                                        {unitPreview.text}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Storage and Handling */}
+                    <div className="form-section">
+                        <div className="section-header">
+                            <h2 className="section-title">🌡️ Storage and Handling</h2>
+                            <p className="section-subtitle">Storage requirements and conditions</p>
+                        </div>
+
+                        <div className="form-grid">
+                            <div className="form-group span-2">
+                                <label htmlFor="storage_requirements" className="form-label">
+                                    Storage Requirements
+                                </label>
+                                <select
+                                    id="storage_requirements"
+                                    name="storage_requirements"
+                                    value={formData.storage_requirements}
+                                    onChange={handleChange}
+                                    className="form-select"
+                                >
+                                    <option value="">Select Storage Requirements</option>
+                                    {storageOptions.map(opt => (
+                                        <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Inventory Management */}
+                    <div className="form-section">
+                        <div className="section-header">
+                            <h2 className="section-title">📊 Inventory Management</h2>
+                            <p className="section-subtitle">Stock tracking and alerts</p>
+                        </div>
+
+                        <div className="form-grid">
                             <div className="form-group">
                                 <label htmlFor="reorder_level" className="form-label">
                                     Reorder Level <span className="required">*</span>
@@ -462,24 +865,7 @@ export default function CreateProduct() {
                                 {errors.reorder_level && (
                                     <span className="error-message">{errors.reorder_level}</span>
                                 )}
-                                <span className="help-text">
-                                    Alert when stock falls below this level
-                                </span>
-                            </div>
-
-                            <div className="form-group span-2">
-                                <label htmlFor="storage_requirements" className="form-label">
-                                    Storage Requirements
-                                </label>
-                                <textarea
-                                    id="storage_requirements"
-                                    name="storage_requirements"
-                                    value={formData.storage_requirements}
-                                    onChange={handleChange}
-                                    className="form-textarea"
-                                    rows="3"
-                                    placeholder="e.g., Store in a cool, dry place. Keep away from direct sunlight."
-                                />
+                                <span className="help-text">Alert when stock falls below this level</span>
                             </div>
                         </div>
                     </div>
@@ -508,8 +894,8 @@ export default function CreateProduct() {
                             ) : (
                                 <>
                                     <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
-                                        <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        <path d="M17 21v-8H7v8M7 3v5h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                        <path d="M17 21v-8H7v8M7 3v5h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
                                     Create Product
                                 </>
@@ -527,7 +913,6 @@ export default function CreateProduct() {
                     min-height: 100vh;
                 }
 
-                /* Header */
                 .page-header {
                     margin-bottom: 2.5rem;
                 }
@@ -572,7 +957,6 @@ export default function CreateProduct() {
                     margin: 0;
                 }
 
-                /* Form */
                 .product-form {
                     display: flex;
                     flex-direction: column;
@@ -592,7 +976,6 @@ export default function CreateProduct() {
                     font-size: 0.9375rem;
                 }
 
-                /* Form Sections */
                 .form-section {
                     background: white;
                     border-radius: 16px;
@@ -621,7 +1004,6 @@ export default function CreateProduct() {
                     margin: 0;
                 }
 
-                /* Form Grid */
                 .form-grid {
                     display: grid;
                     grid-template-columns: repeat(2, 1fr);
@@ -678,11 +1060,13 @@ export default function CreateProduct() {
                     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
                 }
 
-                .form-input.error {
+                .form-input.error,
+                .form-select.error {
                     border-color: #EF4444;
                 }
 
-                .form-input.error:focus {
+                .form-input.error:focus,
+                .form-select.error:focus {
                     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
                 }
 
@@ -703,7 +1087,48 @@ export default function CreateProduct() {
                     font-style: italic;
                 }
 
-                /* Form Actions */
+                .dosage-preview-box,
+                .unit-preview-box {
+                    background: #F9FAFB;
+                    border: 2px dashed #D1D5DB;
+                    border-radius: 10px;
+                    padding: 1rem;
+                }
+
+                .preview-label {
+                    font-size: 0.875rem;
+                    font-weight: 600;
+                    color: #374151;
+                    display: block;
+                    margin-bottom: 0.5rem;
+                }
+
+                .preview-content {
+                    font-size: 1.125rem;
+                    font-weight: 600;
+                    padding: 0.5rem;
+                    border-radius: 6px;
+                    background: white;
+                    text-align: center;
+                }
+
+                .dosage-empty {
+                    color: #9CA3AF;
+                }
+
+                .dosage-incomplete {
+                    color: #F59E0B;
+                }
+
+                .dosage-unit-only {
+                    color: #3B82F6;
+                }
+
+                .dosage-combined {
+                    color: #10B981;
+                    font-weight: 700;
+                }
+
                 .form-actions {
                     display: flex;
                     justify-content: flex-end;

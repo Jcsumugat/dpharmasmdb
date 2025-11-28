@@ -193,7 +193,7 @@ export default function Dashboard({ stats }) {
                 </div>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .dashboard-container {
                     padding: 2.5rem;
                     max-width: 1600px;
@@ -423,7 +423,7 @@ function MetricCard({ icon, iconBg, iconColor, label, value, change, changeLabel
                 )}
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .metric-card {
                     background: white;
                     padding: 1.75rem;
@@ -512,7 +512,7 @@ function RevenueCard({ label, value, icon, gradient, featured }) {
                 <h3 className="revenue-value">{value}</h3>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .revenue-card {
                     padding: 2rem;
                     border-radius: 16px;
@@ -582,7 +582,7 @@ function StatusItem({ label, value, color, alert }) {
             <span className="status-label">{label}</span>
             <span className="status-value" style={{ color: color }}>{value}</span>
 
-            <style jsx>{`
+            <style>{`
                 .status-item {
                     display: flex;
                     align-items: center;

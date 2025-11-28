@@ -10,15 +10,16 @@ export default function AuthenticatedLayout({ children }) {
         router.post(route('admin.logout'));
     };
 
-    const navigation = [
-        { name: 'Dashboard', href: 'admin.dashboard', icon: '📊' },
-        { name: 'Products', href: 'admin.products', icon: '💊' },
-        { name: 'Orders', href: 'admin.orders', icon: '📦' },
-        { name: 'Prescriptions', href: 'admin.prescriptions', icon: '📋' },
-        { name: 'Customers', href: 'admin.customers', icon: '👥' },
-        { name: 'Conversations', href: 'admin.conversations', icon: '💬' },
-        { name: 'Reports', href: 'admin.reports', icon: '📈' },
-    ];
+const navigation = [
+    { name: 'Dashboard', href: 'admin.dashboard', icon: '📊' },
+    { name: 'Suppliers', href: 'admin.suppliers', icon: '📦' },
+    { name: 'Products', href: 'admin.products', icon: '💊' },
+    { name: 'Orders', href: 'admin.orders', icon: '🛒' },
+    { name: 'Prescriptions', href: 'admin.prescriptions', icon: '📋' },
+    { name: 'Customers', href: 'admin.customers', icon: '👥' },
+    { name: 'Conversations', href: 'admin.conversations', icon: '💬' },
+    { name: 'Reports', href: 'admin.reports', icon: '📈' },
+];
 
     const isActive = (routeName) => {
         try {

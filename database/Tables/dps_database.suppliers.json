@@ -1,0 +1,48 @@
+[{
+  "_id": {
+    "$oid": "692558d833ae19973f0930d7"
+  },
+  "name": "Medicine Manufacturer",
+  "contact_person": "John Carlo Sumugat",
+  "phone": "09567460163",
+  "email": "jcsumugatxd@gmail.com",
+  "address": "Poblacion, Culasi Antique",
+  "created_at": {
+    "$date": "2025-06-03T22:13:11.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-06-03T22:13:11.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "692558d833ae19973f0930d8"
+  },
+  "name": "Mercury Drug Store",
+  "contact_person": "Mrs. Jane Yap",
+  "phone": "09567456772",
+  "email": "mrsjane@gmail.com",
+  "address": "Poblacion, Culasi Antique",
+  "created_at": {
+    "$date": "2025-06-03T22:13:39.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-06-03T22:13:39.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "692558d833ae19973f0930d9"
+  },
+  "name": "Ailyn",
+  "contact_person": "Mrs. Jane Yap",
+  "phone": "09567456772",
+  "email": "jcsumugatxd@gmail.com",
+  "address": "MAlabor",
+  "created_at": {
+    "$date": "2025-09-25T10:19:40.000Z"
+  },
+  "updated_at": {
+    "$date": "2025-09-25T10:19:40.000Z"
+  }
+}]

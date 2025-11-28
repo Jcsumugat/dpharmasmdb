@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\SupplierController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -45,6 +46,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/products/create', function () {
             return Inertia::render('Admin/Products/Create');
         })->name('products.create');
+
+        Route::get('/suppliers', function () {
+            return Inertia::render('Admin/Suppliers/Index');
+        })->name('suppliers');
 
         Route::get('/products', function () {
             return Inertia::render('Admin/Products/Index');
@@ -98,6 +103,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
                     'suppliers' => []
                 ]);
             })->name('suppliers.index');
+
+            // Suppliers
+            Route::get('/suppliers', [SupplierController::class, 'apiIndex'])->name('suppliers.index');
+            Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
+            Route::put('/suppliers/{id}', [SupplierController::class, 'update'])->name('suppliers.update');
+            Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
+
 
             // Products
             Route::apiResource('products', ProductController::class);

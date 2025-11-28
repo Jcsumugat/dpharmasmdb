@@ -22,20 +22,9 @@ class Supplier extends Model
         'updated_at' => 'datetime',
     ];
 
-    // Relationships
+    // Relationship with products
     public function products()
     {
         return $this->hasMany(Product::class, 'supplier_id');
-    }
-
-    // Helper methods
-    public function getActiveProductsCount()
-    {
-        return $this->products()->where('stock_quantity', '>', 0)->count();
-    }
-
-    public function getTotalProductsValue()
-    {
-        return $this->products()->sum('stock_quantity');
     }
 }
