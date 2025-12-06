@@ -10,9 +10,138 @@ use App\Models\StockMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use MongoDB\BSON\ObjectId;
+use Carbon\Carbon;
 
 class ProductController extends Controller
 {
+    public function store(Request $request)
+    {
+        try {
+            // Log incoming request for debugging
+            \Log::info('Product creation request received', [
+                'data' => $request->all()
+            ]);
+
+            $validated = $request->validate([
+                'product_name' => 'required|string|max:100',
+                'product_code' => 'nullable|string|unique:products,product_code',
+                'generic_name' => 'nullable|string|max:100',
+                'brand_name' => 'nullable|string|max:100',
+                'manufacturer' => 'nullable|string|max:100',
+                'product_type' => 'required|string',
+                'form_type' => 'required|string',
+                'dosage_unit' => 'required|string',
+                'classification' => 'required|integer',
+                'category_id' => 'nullable|string',
+                'supplier_id' => 'nullable|string',
+                'reorder_level' => 'required|integer|min:0',
+                'unit' => 'required|string',
+                'unit_quantity' => 'required|numeric|min:0.01',
+                'storage_requirements' => 'nullable|string',
+            ]);
+
+            // Generate product code if not provided
+            if (empty($validated['product_code'])) {
+                $validated['product_code'] = $this->generateProductCode();
+            }
+
+            // CRITICAL: Ensure proper data types
+            $validated['classification'] = (int) $validated['classification'];
+            $validated['reorder_level'] = (int) $validated['reorder_level'];
+            $validated['unit_quantity'] = (float) $validated['unit_quantity'];
+
+            // Debug log to verify the value
+            \Log::info('Creating product with unit_quantity', [
+                'unit_quantity' => $validated['unit_quantity'],
+                'type' => gettype($validated['unit_quantity']),
+                'all_data' => $validated
+            ]);
+
+            // Initialize stock and batches
+            $validated['stock_quantity'] = 0;
+            $validated['batches'] = [];
+
+            $product = Product::create($validated);
+
+            // Verify it was saved correctly
+            $savedProduct = Product::find($product->_id);
+            \Log::info('Product created successfully', [
+                'product_id' => $savedProduct->_id,
+                'unit' => $savedProduct->unit,
+                'unit_quantity' => $savedProduct->unit_quantity,
+                'unit_quantity_type' => gettype($savedProduct->unit_quantity)
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Product created successfully',
+                'product' => $savedProduct
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Validation failed', [
+                'errors' => $e->errors()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Failed to create product', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create product: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update product
+     */
+    public function update(Request $request, $id)
+    {
+        $product = Product::findOrFail($id);
+
+        $validated = $request->validate([
+            'product_name' => 'sometimes|string|max:100',
+            'generic_name' => 'nullable|string|max:100',
+            'brand_name' => 'nullable|string|max:100',
+            'manufacturer' => 'nullable|string|max:100',
+            'product_type' => 'sometimes|string',
+            'form_type' => 'sometimes|string',
+            'dosage_unit' => 'sometimes|string',
+            'classification' => 'sometimes|integer',
+            'reorder_level' => 'sometimes|integer|min:0',
+            'unit' => 'sometimes|string',
+            'unit_quantity' => 'sometimes|numeric|min:0.01',
+            'storage_requirements' => 'nullable|string',
+        ]);
+
+        // Ensure proper data types if fields are present
+        if (isset($validated['classification'])) {
+            $validated['classification'] = (int) $validated['classification'];
+        }
+        if (isset($validated['reorder_level'])) {
+            $validated['reorder_level'] = (int) $validated['reorder_level'];
+        }
+        if (isset($validated['unit_quantity'])) {
+            $validated['unit_quantity'] = (float) $validated['unit_quantity'];
+        }
+
+        $product->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product updated successfully',
+            'product' => $product
+        ]);
+    }
+
     /**
      * Get all products with available stock
      */
@@ -20,32 +149,27 @@ class ProductController extends Controller
     {
         $query = Product::query();
 
-        // Search
         if ($request->has('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('product_name', 'like', "%{$search}%")
-                  ->orWhere('product_code', 'like', "%{$search}%")
-                  ->orWhere('brand_name', 'like', "%{$search}%");
+                    ->orWhere('product_code', 'like', "%{$search}%")
+                    ->orWhere('brand_name', 'like', "%{$search}%");
             });
         }
 
-        // Filter by category
         if ($request->has('category_id')) {
             $query->where('category_id', $request->category_id);
         }
 
-        // Filter by stock status
         if ($request->has('stock_status')) {
             switch ($request->stock_status) {
                 case 'in_stock':
-                    // Products with available stock
                     $query->where('stock_quantity', '>', 0);
                     break;
                 case 'low_stock':
-                    // Products at or below reorder level
                     $query->whereRaw('stock_quantity <= reorder_level')
-                          ->where('stock_quantity', '>', 0);
+                        ->where('stock_quantity', '>', 0);
                     break;
                 case 'out_of_stock':
                     $query->where('stock_quantity', 0);
@@ -54,10 +178,9 @@ class ProductController extends Controller
         }
 
         $products = $query->with(['category', 'supplier'])
-                          ->orderBy('product_name')
-                          ->paginate(20);
+            ->orderBy('product_name')
+            ->paginate(20);
 
-        // Enhance with batch information
         $products->getCollection()->transform(function ($product) {
             $availableBatches = $product->getAvailableBatches();
 
@@ -76,84 +199,12 @@ class ProductController extends Controller
     }
 
     /**
-     * Create new product
-     */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'product_name' => 'required|string|max:100',
-            'product_code' => 'nullable|string|unique:products,product_code',
-            'generic_name' => 'nullable|string|max:100',
-            'brand_name' => 'nullable|string|max:100',
-            'manufacturer' => 'nullable|string|max:100',
-            'product_type' => 'required|string|in:OTC,Prescription',
-            'form_type' => 'required|string',
-            'dosage_unit' => 'required|string',
-            'classification' => 'required|integer|min:1|max:13',
-            'category_id' => 'nullable|string',
-            'supplier_id' => 'nullable|string',
-            'reorder_level' => 'required|integer|min:0',
-            'unit' => 'required|string',
-            'unit_quantity' => 'required|numeric|min:0.01',
-            'storage_requirements' => 'nullable|string',
-        ]);
-
-        // Generate product code if not provided
-        if (!$validated['product_code']) {
-            $validated['product_code'] = $this->generateProductCode();
-        }
-
-        $validated['stock_quantity'] = 0; // Initially zero, updated when batches added
-        $validated['batches'] = []; // Empty array for embedded batches
-
-        $product = Product::create($validated);
-
-        Log::info('Product created', ['product_id' => $product->_id]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product created successfully',
-            'product' => $product
-        ], 201);
-    }
-
-    /**
-     * Update product
-     */
-    public function update(Request $request, $id)
-    {
-        $product = Product::findOrFail($id);
-
-        $validated = $request->validate([
-            'product_name' => 'sometimes|string|max:100',
-            'generic_name' => 'nullable|string|max:100',
-            'brand_name' => 'nullable|string|max:100',
-            'manufacturer' => 'nullable|string|max:100',
-            'product_type' => 'sometimes|string|in:OTC,Prescription',
-            'form_type' => 'sometimes|string',
-            'dosage_unit' => 'sometimes|string',
-            'classification' => 'sometimes|integer|min:1|max:13',
-            'reorder_level' => 'sometimes|integer|min:0',
-            'storage_requirements' => 'nullable|string',
-        ]);
-
-        $product->update($validated);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product updated successfully',
-            'product' => $product
-        ]);
-    }
-
-    /**
      * Delete product
      */
     public function destroy($id)
     {
         $product = Product::findOrFail($id);
 
-        // Check if product has batches with stock
         if ($product->getAvailableStock() > 0) {
             return response()->json([
                 'success' => false,
@@ -174,26 +225,69 @@ class ProductController extends Controller
      */
     public function addBatch(Request $request, $id)
     {
-        $product = Product::findOrFail($id);
-
-        $validated = $request->validate([
-            'batch_number' => 'required|string',
-            'expiration_date' => 'required|date|after:today',
-            'quantity_received' => 'required|integer|min:1',
-            'unit_cost' => 'required|numeric|min:0',
-            'sale_price' => 'required|numeric|min:0',
-            'received_date' => 'required|date|before_or_equal:today',
-            'supplier_id' => 'nullable|string',
-            'notes' => 'nullable|string',
-        ]);
-
         try {
-            $batch = $product->addBatch($validated);
+            $product = Product::findOrFail($id);
+
+            $validated = $request->validate([
+                'batch_number' => 'nullable|string',
+                'expiration_date' => 'required|date|after:today',
+                'quantity_received' => 'required|numeric|min:1',
+                'unit_cost' => 'required|numeric|min:0',
+                'sale_price' => 'required|numeric|min:0',
+                'received_date' => 'required|date|before_or_equal:today',
+                'supplier_id' => 'nullable|string',
+                'unit' => 'nullable|string',
+                'unit_quantity' => 'nullable|numeric|min:0.01',
+                'notes' => 'nullable|string|max:1000',
+            ]);
+
+            // Generate batch number if not provided
+            if (empty($validated['batch_number'])) {
+                $validated['batch_number'] = $this->generateBatchNumber($product);
+            }
+
+            // Check for duplicate batch number
+            $existingBatch = collect($product->batches ?? [])
+                ->firstWhere('batch_number', $validated['batch_number']);
+
+            if ($existingBatch) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Batch number '{$validated['batch_number']}' already exists"
+                ], 422);
+            }
+
+            // Prepare batch data
+            $batchData = [
+                'batch_number' => $validated['batch_number'],
+                'expiration_date' => $validated['expiration_date'],
+                'quantity_received' => (int) $validated['quantity_received'],
+                'quantity_remaining' => (int) $validated['quantity_received'],
+                'unit_cost' => (float) $validated['unit_cost'],
+                'sale_price' => (float) $validated['sale_price'],
+                'received_date' => $validated['received_date'],
+                'supplier_id' => $validated['supplier_id'] ?? $product->supplier_id,
+                'notes' => $validated['notes'] ?? null,
+                // FIX: Include unit and unit_quantity
+                // Use batch-specific values if provided, otherwise inherit from product
+                'unit' => $validated['unit'] ?? $product->unit,
+                'unit_quantity' => isset($validated['unit_quantity'])
+                    ? (float) $validated['unit_quantity']
+                    : (float) $product->unit_quantity,
+            ];
+
+            // Debug log
+            Log::info('Adding batch with unit data', [
+                'product_id' => $product->_id,
+                'batch_data' => $batchData
+            ]);
+
+            $batch = $product->addBatch($batchData);
 
             // Record stock movement
             StockMovement::recordMovement(
                 $product->_id,
-                StockMovement::TYPE_PURCHASE,
+                'purchase',
                 $validated['quantity_received'],
                 'purchase',
                 null,
@@ -206,11 +300,18 @@ class ProductController extends Controller
                 'message' => 'Batch added successfully',
                 'batch' => $batch,
                 'product_stock' => $product->fresh()->stock_quantity
-            ]);
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
         } catch (\Exception $e) {
             Log::error('Failed to add batch', [
                 'product_id' => $id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
@@ -269,7 +370,6 @@ class ProductController extends Controller
                 $validated['reason']
             );
 
-            // Record stock movement
             StockMovement::recordMovement(
                 $product->_id,
                 'sale',
@@ -328,16 +428,43 @@ class ProductController extends Controller
     }
 
     /**
+     * Generate unique batch number for a product
+     */
+    private function generateBatchNumber($product)
+    {
+        $yearMonth = Carbon::now()->format('Ym');
+        $productCode = $product->product_code ?? 'PROD';
+        $existingBatches = collect($product->batches ?? []);
+        $prefix = "BTH-{$yearMonth}-{$productCode}";
+
+        $highestSequence = 0;
+        foreach ($existingBatches as $batch) {
+            if (isset($batch['batch_number']) && str_starts_with($batch['batch_number'], $prefix)) {
+                $parts = explode('-', $batch['batch_number']);
+                if (count($parts) >= 4) {
+                    $sequence = (int) end($parts);
+                    if ($sequence > $highestSequence) {
+                        $highestSequence = $sequence;
+                    }
+                }
+            }
+        }
+
+        $nextSequence = str_pad($highestSequence + 1, 3, '0', STR_PAD_LEFT);
+        return "{$prefix}-{$nextSequence}";
+    }
+
+    /**
      * Get low stock products
      */
     public function lowStock()
     {
-        $products = Product::where(function($query) {
+        $products = Product::where(function ($query) {
             $query->whereRaw('stock_quantity <= reorder_level')
-                  ->where('stock_quantity', '>', 0);
+                ->where('stock_quantity', '>', 0);
         })->with(['category', 'supplier'])
-          ->orderBy('stock_quantity', 'asc')
-          ->get();
+            ->orderBy('stock_quantity', 'asc')
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -352,9 +479,9 @@ class ProductController extends Controller
     {
         $days = $request->get('days', 30);
 
-        $products = Product::all()->filter(function($product) use ($days) {
+        $products = Product::all()->filter(function ($product) use ($days) {
             $batches = collect($product->batches ?? []);
-            return $batches->filter(function($batch) use ($days) {
+            return $batches->filter(function ($batch) use ($days) {
                 $expiryDate = \Carbon\Carbon::parse($batch['expiration_date']);
                 return $expiryDate->lte(now()->addDays($days))
                     && $expiryDate->gt(now())

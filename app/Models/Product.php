@@ -1,9 +1,5 @@
 <?php
 
-// ==============================================================================
-// app/Models/Product.php - Product with Embedded Batches
-// ==============================================================================
-
 namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;

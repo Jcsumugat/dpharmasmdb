@@ -32,15 +32,6 @@ export default function CreateProduct() {
         fetchSuppliers();
     }, []);
 
-    useEffect(() => {
-        updateUnitQuantityLabel();
-        updateUnitPreview();
-    }, [formData.unit, formData.unit_quantity, formData.form_type]);
-
-    useEffect(() => {
-        updateDosagePreview();
-    }, [formData.dosage_strength, formData.dosage_unit]);
-
     const fetchCategories = async () => {
         try {
             const response = await fetch('/admin/api/categories');
@@ -114,6 +105,10 @@ export default function CreateProduct() {
         try {
             const submitData = {
                 ...formData,
+                // Convert numeric strings to actual numbers
+                unit_quantity: parseFloat(formData.unit_quantity),
+                reorder_level: parseInt(formData.reorder_level),
+                classification: parseInt(formData.classification),
                 dosage_unit: formData.dosage_strength && formData.dosage_unit
                     ? `${formData.dosage_strength}${formData.dosage_unit}`
                     : (formData.dosage_unit || formData.dosage_strength)
@@ -149,18 +144,6 @@ export default function CreateProduct() {
 
     const handleCancel = () => {
         router.visit('/admin/products');
-    };
-
-    const updateUnitQuantityLabel = () => {
-        // This will be used to display dynamic label text
-    };
-
-    const updateUnitPreview = () => {
-        // This will be used to display preview text
-    };
-
-    const updateDosagePreview = () => {
-        // This will be used to update dosage preview
     };
 
     const getUnitQuantityLabel = () => {
@@ -256,11 +239,11 @@ export default function CreateProduct() {
         const unitDisplay = unitDisplayMap[selectedUnit] || selectedUnit;
 
         if (!selectedUnit) {
-            return { text: 'Select packaging unit above', color: '#6c757d' };
+            return { text: 'Select packaging unit above', color: 'text-gray-500' };
         }
 
         if (quantity <= 0) {
-            return { text: `Enter quantity for ${unitDisplay}`, color: '#6c757d' };
+            return { text: `Enter quantity for ${unitDisplay}`, color: 'text-gray-500' };
         }
 
         let preview = '';
@@ -289,7 +272,7 @@ export default function CreateProduct() {
             preview = `Stock counted in: ${unitDisplay}s containing ${quantity} units each`;
         }
 
-        return { text: preview, color: '#28a745' };
+        return { text: preview, color: 'text-green-600' };
     };
 
     const getDosagePreview = () => {
@@ -297,13 +280,13 @@ export default function CreateProduct() {
         const unit = formData.dosage_unit;
 
         if (strength && unit) {
-            return { text: strength + unit, className: 'combined' };
+            return { text: strength + unit, color: 'text-green-600 font-bold' };
         } else if (unit) {
-            return { text: unit, className: 'unit-only' };
+            return { text: unit, color: 'text-blue-600' };
         } else if (strength) {
-            return { text: strength + ' (select unit)', className: 'incomplete' };
+            return { text: strength + ' (select unit)', color: 'text-yellow-600' };
         } else {
-            return { text: 'Enter strength and unit above', className: 'empty' };
+            return { text: 'Enter strength and unit above', color: 'text-gray-400' };
         }
     };
 
@@ -340,33 +323,15 @@ export default function CreateProduct() {
     ];
 
     const manufacturerOptions = [
-        'Pfizer Inc.',
-        'Johnson & Johnson',
-        'GlaxoSmithKline',
-        'Novartis AG',
-        'Merck & Co.',
-        'AbbVie Inc.',
-        'Bristol-Myers Squibb',
-        'AstraZeneca',
-        'Sanofi S.A.',
-        'Roche Holding AG',
-        'United Laboratories (Unilab)',
-        'Zuellig Pharma',
-        'Mercury Drug',
-        'Pascual Laboratories',
-        'Hizon Laboratories',
-        'Other'
+        'Pfizer Inc.', 'Johnson & Johnson', 'GlaxoSmithKline', 'Novartis AG', 'Merck & Co.',
+        'AbbVie Inc.', 'Bristol-Myers Squibb', 'AstraZeneca', 'Sanofi S.A.', 'Roche Holding AG',
+        'United Laboratories (Unilab)', 'Zuellig Pharma', 'Mercury Drug', 'Pascual Laboratories',
+        'Hizon Laboratories', 'Other'
     ];
 
     const productTypeOptions = [
-        'Prescription',
-        'OTC',
-        'Herbal',
-        'Food Supplement',
-        'Vitamins & Minerals',
-        'Medical Device',
-        'Cosmeceutical',
-        'Veterinary'
+        'Prescription', 'OTC', 'Herbal', 'Food Supplement', 'Vitamins & Minerals',
+        'Medical Device', 'Cosmeceutical', 'Veterinary'
     ];
 
     const storageOptions = [
@@ -451,24 +416,29 @@ export default function CreateProduct() {
         <AuthenticatedLayout>
             <Head title="Create New Product" />
 
-            <div className="create-product-container">
-                <div className="page-header">
-                    <button className="back-button" onClick={handleCancel}>
-                        <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
+            <div className="p-6 md:p-10 max-w-5xl mx-auto min-h-screen">
+                {/* Page Header */}
+                <div className="mb-10">
+                    <button
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 rounded-xl text-gray-600 font-semibold text-sm hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-600 transition-all mb-6"
+                        onClick={handleCancel}
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
                             <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                         Back to Products
                     </button>
-                    <div className="header-content">
-                        <h1 className="page-title">Create New Product</h1>
-                        <p className="page-subtitle">Add a new product to your pharmacy inventory</p>
+                    <div className="mt-4">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-2 tracking-tight">Create New Product</h1>
+                        <p className="text-gray-600">Add a new product to your pharmacy inventory</p>
                     </div>
                 </div>
 
-                <div className="product-form">
+                <div className="flex flex-col gap-8">
+                    {/* Error Banner */}
                     {errors.general && (
-                        <div className="error-banner">
-                            <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
+                        <div className="flex items-center gap-3 px-5 py-4 bg-red-100 border-2 border-red-100 rounded-xl text-red-800 font-medium">
+                            <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
                                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
                                 <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                             </svg>
@@ -477,16 +447,16 @@ export default function CreateProduct() {
                     )}
 
                     {/* Basic Information */}
-                    <div className="form-section">
-                        <div className="section-header">
-                            <h2 className="section-title">📋 Basic Information</h2>
-                            <p className="section-subtitle">Essential product details</p>
+                    <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+                        <div className="mb-6 pb-4 border-b-2 border-gray-100">
+                            <h2 className="text-xl font-bold text-gray-900 mb-1 tracking-tight">📋 Basic Information</h2>
+                            <p className="text-sm text-gray-600">Essential product details</p>
                         </div>
 
-                        <div className="form-grid">
-                            <div className="form-group">
-                                <label htmlFor="product_name" className="form-label">
-                                    Product Name <span className="required">*</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="product_name" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                    Product Name <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -494,19 +464,22 @@ export default function CreateProduct() {
                                     name="product_name"
                                     value={formData.product_name}
                                     onChange={handleChange}
-                                    className={`form-input ${errors.product_name ? 'error' : ''}`}
+                                    className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-4 transition-all ${errors.product_name
+                                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500/10'
+                                            : 'border-gray-200 focus:border-indigo-500 focus:ring-indigo-500/10'
+                                        }`}
                                     placeholder="e.g., Biogesic 500mg"
                                 />
                                 {errors.product_name && (
-                                    <span className="error-message">{errors.product_name}</span>
+                                    <span className="text-xs text-red-500 font-medium">{errors.product_name}</span>
                                 )}
-                                <span className="help-text">Enter the complete product name as it appears on packaging</span>
+                                <span className="text-xs text-gray-600 italic">Enter the complete product name as it appears on packaging</span>
                             </div>
 
-                            <div className="form-group">
-                                <label htmlFor="product_code" className="form-label">
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="product_code" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                                     Product Code
-                                    <span className="optional">(Auto-generated if empty)</span>
+                                    <span className="font-normal text-gray-400 text-xs">(Auto-generated if empty)</span>
                                 </label>
                                 <input
                                     type="text"
@@ -514,13 +487,13 @@ export default function CreateProduct() {
                                     name="product_code"
                                     value={formData.product_code}
                                     onChange={handleChange}
-                                    className="form-input"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                     placeholder="e.g., P1234"
                                 />
                             </div>
 
-                            <div className="form-group">
-                                <label htmlFor="generic_name" className="form-label">
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="generic_name" className="text-sm font-semibold text-gray-700">
                                     Generic Name
                                 </label>
                                 <input
@@ -529,7 +502,7 @@ export default function CreateProduct() {
                                     name="generic_name"
                                     value={formData.generic_name}
                                     onChange={handleChange}
-                                    className="form-input"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                     placeholder="e.g., Paracetamol"
                                     list="generic_names_list"
                                 />
@@ -538,11 +511,11 @@ export default function CreateProduct() {
                                         <option key={name} value={name} />
                                     ))}
                                 </datalist>
-                                <span className="help-text">Active pharmaceutical ingredient (API) name</span>
+                                <span className="text-xs text-gray-600 italic">Active pharmaceutical ingredient (API) name</span>
                             </div>
 
-                            <div className="form-group">
-                                <label htmlFor="brand_name" className="form-label">
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="brand_name" className="text-sm font-semibold text-gray-700">
                                     Brand Name
                                 </label>
                                 <input
@@ -551,22 +524,22 @@ export default function CreateProduct() {
                                     name="brand_name"
                                     value={formData.brand_name}
                                     onChange={handleChange}
-                                    className="form-input"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                     placeholder="e.g., Biogesic"
                                 />
-                                <span className="help-text">Commercial brand or trade name (Optional)</span>
+                                <span className="text-xs text-gray-600 italic">Commercial brand or trade name (Optional)</span>
                             </div>
 
-                            <div className="form-group span-2">
-                                <label htmlFor="manufacturer" className="form-label">
-                                    Manufacturer <span className="required">*</span>
+                            <div className="flex flex-col gap-2 md:col-span-2">
+                                <label htmlFor="manufacturer" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                    Manufacturer <span className="text-red-500">*</span>
                                 </label>
                                 <select
                                     id="manufacturer"
                                     name="manufacturer"
                                     value={formData.manufacturer}
                                     onChange={handleChange}
-                                    className="form-select"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                 >
                                     <option value="">Select Manufacturer</option>
                                     {manufacturerOptions.map(mfr => (
@@ -578,23 +551,23 @@ export default function CreateProduct() {
                     </div>
 
                     {/* Classification */}
-                    <div className="form-section">
-                        <div className="section-header">
-                            <h2 className="section-title">🏷️ Classification</h2>
-                            <p className="section-subtitle">Product type and category</p>
+                    <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+                        <div className="mb-6 pb-4 border-b-2 border-gray-100">
+                            <h2 className="text-xl font-bold text-gray-900 mb-1 tracking-tight">🏷️ Classification</h2>
+                            <p className="text-sm text-gray-600">Product type and category</p>
                         </div>
 
-                        <div className="form-grid">
-                            <div className="form-group">
-                                <label htmlFor="product_type" className="form-label">
-                                    Product Type <span className="required">*</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="product_type" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                    Product Type <span className="text-red-500">*</span>
                                 </label>
                                 <select
                                     id="product_type"
                                     name="product_type"
                                     value={formData.product_type}
                                     onChange={handleChange}
-                                    className="form-select"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                 >
                                     <option value="">Select Medicine Type</option>
                                     {productTypeOptions.map(type => (
@@ -603,16 +576,16 @@ export default function CreateProduct() {
                                 </select>
                             </div>
 
-                            <div className="form-group">
-                                <label htmlFor="form_type" className="form-label">
-                                    Form Type <span className="required">*</span>
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="form_type" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                    Form Type <span className="text-red-500">*</span>
                                 </label>
                                 <select
                                     id="form_type"
                                     name="form_type"
                                     value={formData.form_type}
                                     onChange={handleChange}
-                                    className="form-select"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                 >
                                     <option value="">Select Dosage Form</option>
                                     {formTypeOptions.map(group => (
@@ -625,16 +598,16 @@ export default function CreateProduct() {
                                 </select>
                             </div>
 
-                            <div className="form-group">
-                                <label htmlFor="classification" className="form-label">
-                                    Drug Classification <span className="required">*</span>
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="classification" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                    Drug Classification <span className="text-red-500">*</span>
                                 </label>
                                 <select
                                     id="classification"
                                     name="classification"
                                     value={formData.classification}
                                     onChange={handleChange}
-                                    className="form-select"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                 >
                                     {classificationOptions.map(opt => (
                                         <option key={opt.value} value={opt.value}>
@@ -644,8 +617,8 @@ export default function CreateProduct() {
                                 </select>
                             </div>
 
-                            <div className="form-group">
-                                <label htmlFor="category_id" className="form-label">
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="category_id" className="text-sm font-semibold text-gray-700">
                                     Category
                                 </label>
                                 <select
@@ -653,7 +626,7 @@ export default function CreateProduct() {
                                     name="category_id"
                                     value={formData.category_id}
                                     onChange={handleChange}
-                                    className="form-select"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                 >
                                     <option value="">Select category...</option>
                                     {categories.map(cat => (
@@ -664,8 +637,8 @@ export default function CreateProduct() {
                                 </select>
                             </div>
 
-                            <div className="form-group span-2">
-                                <label htmlFor="supplier_id" className="form-label">
+                            <div className="flex flex-col gap-2 md:col-span-2">
+                                <label htmlFor="supplier_id" className="text-sm font-semibold text-gray-700">
                                     Default Supplier
                                 </label>
                                 <select
@@ -673,7 +646,7 @@ export default function CreateProduct() {
                                     name="supplier_id"
                                     value={formData.supplier_id}
                                     onChange={handleChange}
-                                    className="form-select"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                 >
                                     <option value="">Select supplier...</option>
                                     {suppliers.map(sup => (
@@ -687,15 +660,15 @@ export default function CreateProduct() {
                     </div>
 
                     {/* Dosage and Formulation */}
-                    <div className="form-section">
-                        <div className="section-header">
-                            <h2 className="section-title">💊 Dosage and Formulation</h2>
-                            <p className="section-subtitle">Strength and dosage information</p>
+                    <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+                        <div className="mb-6 pb-4 border-b-2 border-gray-100">
+                            <h2 className="text-xl font-bold text-gray-900 mb-1 tracking-tight">💊 Dosage and Formulation</h2>
+                            <p className="text-sm text-gray-600">Strength and dosage information</p>
                         </div>
 
-                        <div className="form-grid">
-                            <div className="form-group">
-                                <label htmlFor="dosage_strength" className="form-label">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="dosage_strength" className="text-sm font-semibold text-gray-700">
                                     Dosage Strength
                                 </label>
                                 <input
@@ -704,22 +677,25 @@ export default function CreateProduct() {
                                     name="dosage_strength"
                                     value={formData.dosage_strength}
                                     onChange={handleChange}
-                                    className="form-input"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                     placeholder="e.g., 500, 250, 10"
                                 />
-                                <span className="help-text">Enter numeric value only</span>
+                                <span className="text-xs text-gray-600 italic">Enter numeric value only</span>
                             </div>
 
-                            <div className="form-group">
-                                <label htmlFor="dosage_unit" className="form-label">
-                                    Dosage Unit <span className="required">*</span>
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="dosage_unit" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                    Dosage Unit <span className="text-red-500">*</span>
                                 </label>
                                 <select
                                     id="dosage_unit"
                                     name="dosage_unit"
                                     value={formData.dosage_unit}
                                     onChange={handleChange}
-                                    className={`form-select ${errors.dosage_unit ? 'error' : ''}`}
+                                    className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-4 transition-all ${errors.dosage_unit
+                                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500/10'
+                                            : 'border-gray-200 focus:border-indigo-500 focus:ring-indigo-500/10'
+                                        }`}
                                 >
                                     <option value="">Select Unit</option>
                                     {dosageUnitOptions.map(opt => (
@@ -729,40 +705,40 @@ export default function CreateProduct() {
                                     ))}
                                 </select>
                                 {errors.dosage_unit && (
-                                    <span className="error-message">{errors.dosage_unit}</span>
+                                    <span className="text-xs text-red-500 font-medium">{errors.dosage_unit}</span>
                                 )}
                             </div>
 
-                            <div className="form-group span-2">
-                                <div className="dosage-preview-box">
-                                    <label className="preview-label">Dosage Preview:</label>
-                                    <div className={`preview-content dosage-${dosagePreview.className}`}>
+                            <div className="flex flex-col gap-2 md:col-span-2">
+                                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-4">
+                                    <label className="text-sm font-semibold text-gray-700 block mb-2">Dosage Preview:</label>
+                                    <div className={`text-lg font-semibold p-2 rounded-lg bg-white text-center ${dosagePreview.color}`}>
                                         {dosagePreview.text}
                                     </div>
                                 </div>
-                                <span className="help-text">e.g., 500mg, 250mg/5mL, 1%, 1:1000</span>
+                                <span className="text-xs text-gray-600 italic">e.g., 500mg, 250mg/5mL, 1%, 1:1000</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Packaging & Units */}
-                    <div className="form-section">
-                        <div className="section-header">
-                            <h2 className="section-title">📦 Packaging & Units</h2>
-                            <p className="section-subtitle">Stock management parameters</p>
+                    <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+                        <div className="mb-6 pb-4 border-b-2 border-gray-100">
+                            <h2 className="text-xl font-bold text-gray-900 mb-1 tracking-tight">📦 Packaging & Units</h2>
+                            <p className="text-sm text-gray-600">Stock management parameters</p>
                         </div>
 
-                        <div className="form-grid">
-                            <div className="form-group">
-                                <label htmlFor="unit" className="form-label">
-                                    Packaging Unit <span className="required">*</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="unit" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                    Packaging Unit <span className="text-red-500">*</span>
                                 </label>
                                 <select
                                     id="unit"
                                     name="unit"
                                     value={formData.unit}
                                     onChange={handleChange}
-                                    className="form-select"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                 >
                                     <option value="">Select Packaging Unit</option>
                                     {unitOptions.map(group => (
@@ -775,12 +751,12 @@ export default function CreateProduct() {
                                         </optgroup>
                                     ))}
                                 </select>
-                                <span className="help-text">How is this product packaged? This is NOT the dosage form.</span>
+                                <span className="text-xs text-gray-600 italic">How is this product packaged? This is NOT the dosage form.</span>
                             </div>
 
-                            <div className="form-group">
-                                <label htmlFor="unit_quantity" className="form-label">
-                                    {getUnitQuantityLabel()} <span className="required">*</span>
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="unit_quantity" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                    {getUnitQuantityLabel()} <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="number"
@@ -788,21 +764,24 @@ export default function CreateProduct() {
                                     name="unit_quantity"
                                     value={formData.unit_quantity}
                                     onChange={handleChange}
-                                    className={`form-input ${errors.unit_quantity ? 'error' : ''}`}
+                                    className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-4 transition-all ${errors.unit_quantity
+                                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500/10'
+                                            : 'border-gray-200 focus:border-indigo-500 focus:ring-indigo-500/10'
+                                        }`}
                                     min="0.01"
                                     step="0.01"
                                     placeholder="e.g., 1, 10, 60, 100"
                                 />
                                 {errors.unit_quantity && (
-                                    <span className="error-message">{errors.unit_quantity}</span>
+                                    <span className="text-xs text-red-500 font-medium">{errors.unit_quantity}</span>
                                 )}
-                                <span className="help-text">{getUnitQuantityHelp()}</span>
+                                <span className="text-xs text-gray-600 italic">{getUnitQuantityHelp()}</span>
                             </div>
 
-                            <div className="form-group span-2">
-                                <div className="unit-preview-box">
-                                    <label className="preview-label">Packaging Preview:</label>
-                                    <div className="preview-content" style={{ color: unitPreview.color }}>
+                            <div className="flex flex-col gap-2 md:col-span-2">
+                                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-4">
+                                    <label className="text-sm font-semibold text-gray-700 block mb-2">Packaging Preview:</label>
+                                    <div className={`text-base font-medium p-3 rounded-lg bg-white whitespace-pre-line ${unitPreview.color}`}>
                                         {unitPreview.text}
                                     </div>
                                 </div>
@@ -811,15 +790,15 @@ export default function CreateProduct() {
                     </div>
 
                     {/* Storage and Handling */}
-                    <div className="form-section">
-                        <div className="section-header">
-                            <h2 className="section-title">🌡️ Storage and Handling</h2>
-                            <p className="section-subtitle">Storage requirements and conditions</p>
+                    <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+                        <div className="mb-6 pb-4 border-b-2 border-gray-100">
+                            <h2 className="text-xl font-bold text-gray-900 mb-1 tracking-tight">🌡️ Storage and Handling</h2>
+                            <p className="text-sm text-gray-600">Storage requirements and conditions</p>
                         </div>
 
-                        <div className="form-grid">
-                            <div className="form-group span-2">
-                                <label htmlFor="storage_requirements" className="form-label">
+                        <div className="grid grid-cols-1 gap-6">
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="storage_requirements" className="text-sm font-semibold text-gray-700">
                                     Storage Requirements
                                 </label>
                                 <select
@@ -827,7 +806,7 @@ export default function CreateProduct() {
                                     name="storage_requirements"
                                     value={formData.storage_requirements}
                                     onChange={handleChange}
-                                    className="form-select"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                                 >
                                     <option value="">Select Storage Requirements</option>
                                     {storageOptions.map(opt => (
@@ -841,16 +820,16 @@ export default function CreateProduct() {
                     </div>
 
                     {/* Inventory Management */}
-                    <div className="form-section">
-                        <div className="section-header">
-                            <h2 className="section-title">📊 Inventory Management</h2>
-                            <p className="section-subtitle">Stock tracking and alerts</p>
+                    <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+                        <div className="mb-6 pb-4 border-b-2 border-gray-100">
+                            <h2 className="text-xl font-bold text-gray-900 mb-1 tracking-tight">📊 Inventory Management</h2>
+                            <p className="text-sm text-gray-600">Stock tracking and alerts</p>
                         </div>
 
-                        <div className="form-grid">
-                            <div className="form-group">
-                                <label htmlFor="reorder_level" className="form-label">
-                                    Reorder Level <span className="required">*</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="flex flex-col gap-2">
+                                <label htmlFor="reorder_level" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                    Reorder Level <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="number"
@@ -858,24 +837,27 @@ export default function CreateProduct() {
                                     name="reorder_level"
                                     value={formData.reorder_level}
                                     onChange={handleChange}
-                                    className={`form-input ${errors.reorder_level ? 'error' : ''}`}
+                                    className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-4 transition-all ${errors.reorder_level
+                                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500/10'
+                                            : 'border-gray-200 focus:border-indigo-500 focus:ring-indigo-500/10'
+                                        }`}
                                     min="0"
                                     placeholder="Minimum stock before alert"
                                 />
                                 {errors.reorder_level && (
-                                    <span className="error-message">{errors.reorder_level}</span>
+                                    <span className="text-xs text-red-500 font-medium">{errors.reorder_level}</span>
                                 )}
-                                <span className="help-text">Alert when stock falls below this level</span>
+                                <span className="text-xs text-gray-600 italic">Alert when stock falls below this level</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Form Actions */}
-                    <div className="form-actions">
+                    <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm sticky bottom-8 flex justify-end gap-4">
                         <button
                             type="button"
                             onClick={handleCancel}
-                            className="btn-secondary"
+                            className="px-6 py-3 bg-white border-2 border-gray-200 rounded-xl text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={loading}
                         >
                             Cancel
@@ -883,17 +865,17 @@ export default function CreateProduct() {
                         <button
                             type="button"
                             onClick={handleSubmit}
-                            className="btn-primary"
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                             disabled={loading}
                         >
                             {loading ? (
                                 <>
-                                    <div className="spinner-small"></div>
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                                     Creating...
                                 </>
                             ) : (
                                 <>
-                                    <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
+                                    <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
                                         <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                         <path d="M17 21v-8H7v8M7 3v5h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
@@ -904,334 +886,6 @@ export default function CreateProduct() {
                     </div>
                 </div>
             </div>
-
-            <style>{`
-                .create-product-container {
-                    padding: 2.5rem;
-                    max-width: 1200px;
-                    margin: 0 auto;
-                    min-height: 100vh;
-                }
-
-                .page-header {
-                    margin-bottom: 2.5rem;
-                }
-
-                .back-button {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.625rem 1rem;
-                    background: white;
-                    border: 2px solid #E5E7EB;
-                    border-radius: 10px;
-                    color: #6B7280;
-                    font-weight: 600;
-                    font-size: 0.875rem;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    margin-bottom: 1.5rem;
-                }
-
-                .back-button:hover {
-                    background: #F9FAFB;
-                    border-color: #667eea;
-                    color: #667eea;
-                }
-
-                .header-content {
-                    margin-top: 1rem;
-                }
-
-                .page-title {
-                    font-size: 2rem;
-                    font-weight: 700;
-                    color: #111827;
-                    margin: 0 0 0.5rem 0;
-                    letter-spacing: -0.025em;
-                }
-
-                .page-subtitle {
-                    font-size: 0.9375rem;
-                    color: #6B7280;
-                    margin: 0;
-                }
-
-                .product-form {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 2rem;
-                }
-
-                .error-banner {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.75rem;
-                    padding: 1rem 1.25rem;
-                    background: #FEE2E2;
-                    border: 2px solid #FEE2E2;
-                    border-radius: 12px;
-                    color: #991B1B;
-                    font-weight: 500;
-                    font-size: 0.9375rem;
-                }
-
-                .form-section {
-                    background: white;
-                    border-radius: 16px;
-                    border: 1px solid #E5E7EB;
-                    padding: 2rem;
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-                }
-
-                .section-header {
-                    margin-bottom: 1.5rem;
-                    padding-bottom: 1rem;
-                    border-bottom: 2px solid #F3F4F6;
-                }
-
-                .section-title {
-                    font-size: 1.25rem;
-                    font-weight: 700;
-                    color: #111827;
-                    margin: 0 0 0.25rem 0;
-                    letter-spacing: -0.025em;
-                }
-
-                .section-subtitle {
-                    font-size: 0.875rem;
-                    color: #6B7280;
-                    margin: 0;
-                }
-
-                .form-grid {
-                    display: grid;
-                    grid-template-columns: repeat(2, 1fr);
-                    gap: 1.5rem;
-                }
-
-                .form-group {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.5rem;
-                }
-
-                .form-group.span-2 {
-                    grid-column: span 2;
-                }
-
-                .form-label {
-                    font-size: 0.875rem;
-                    font-weight: 600;
-                    color: #374151;
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                }
-
-                .required {
-                    color: #EF4444;
-                }
-
-                .optional {
-                    font-weight: 400;
-                    color: #9CA3AF;
-                    font-size: 0.8125rem;
-                }
-
-                .form-input,
-                .form-select,
-                .form-textarea {
-                    width: 100%;
-                    padding: 0.875rem 1rem;
-                    border: 2px solid #E5E7EB;
-                    border-radius: 10px;
-                    font-size: 0.9375rem;
-                    color: #111827;
-                    transition: all 0.2s ease;
-                    font-family: inherit;
-                }
-
-                .form-input:focus,
-                .form-select:focus,
-                .form-textarea:focus {
-                    outline: none;
-                    border-color: #667eea;
-                    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-                }
-
-                .form-input.error,
-                .form-select.error {
-                    border-color: #EF4444;
-                }
-
-                .form-input.error:focus,
-                .form-select.error:focus {
-                    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-                }
-
-                .form-textarea {
-                    resize: vertical;
-                    min-height: 80px;
-                }
-
-                .error-message {
-                    font-size: 0.8125rem;
-                    color: #EF4444;
-                    font-weight: 500;
-                }
-
-                .help-text {
-                    font-size: 0.8125rem;
-                    color: #6B7280;
-                    font-style: italic;
-                }
-
-                .dosage-preview-box,
-                .unit-preview-box {
-                    background: #F9FAFB;
-                    border: 2px dashed #D1D5DB;
-                    border-radius: 10px;
-                    padding: 1rem;
-                }
-
-                .preview-label {
-                    font-size: 0.875rem;
-                    font-weight: 600;
-                    color: #374151;
-                    display: block;
-                    margin-bottom: 0.5rem;
-                }
-
-                .preview-content {
-                    font-size: 1.125rem;
-                    font-weight: 600;
-                    padding: 0.5rem;
-                    border-radius: 6px;
-                    background: white;
-                    text-align: center;
-                }
-
-                .dosage-empty {
-                    color: #9CA3AF;
-                }
-
-                .dosage-incomplete {
-                    color: #F59E0B;
-                }
-
-                .dosage-unit-only {
-                    color: #3B82F6;
-                }
-
-                .dosage-combined {
-                    color: #10B981;
-                    font-weight: 700;
-                }
-
-                .form-actions {
-                    display: flex;
-                    justify-content: flex-end;
-                    gap: 1rem;
-                    padding: 2rem;
-                    background: white;
-                    border-radius: 16px;
-                    border: 1px solid #E5E7EB;
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-                    position: sticky;
-                    bottom: 2rem;
-                }
-
-                .btn-primary,
-                .btn-secondary {
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 0.5rem;
-                    padding: 0.875rem 1.75rem;
-                    border-radius: 12px;
-                    font-weight: 600;
-                    font-size: 0.9375rem;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    border: none;
-                }
-
-                .btn-primary {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-                }
-
-                .btn-primary:hover:not(:disabled) {
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-                }
-
-                .btn-primary:disabled {
-                    opacity: 0.6;
-                    cursor: not-allowed;
-                }
-
-                .btn-secondary {
-                    background: white;
-                    border: 2px solid #E5E7EB;
-                    color: #374151;
-                }
-
-                .btn-secondary:hover:not(:disabled) {
-                    background: #F9FAFB;
-                    border-color: #D1D5DB;
-                }
-
-                .btn-secondary:disabled {
-                    opacity: 0.6;
-                    cursor: not-allowed;
-                }
-
-                .spinner-small {
-                    width: 16px;
-                    height: 16px;
-                    border: 2px solid rgba(255, 255, 255, 0.3);
-                    border-top-color: white;
-                    border-radius: 50%;
-                    animation: spin 0.8s linear infinite;
-                }
-
-                @keyframes spin {
-                    to {
-                        transform: rotate(360deg);
-                    }
-                }
-
-                @media (max-width: 768px) {
-                    .create-product-container {
-                        padding: 1.5rem;
-                    }
-
-                    .form-grid {
-                        grid-template-columns: 1fr;
-                    }
-
-                    .form-group.span-2 {
-                        grid-column: span 1;
-                    }
-
-                    .form-section {
-                        padding: 1.5rem;
-                    }
-
-                    .form-actions {
-                        flex-direction: column-reverse;
-                        position: static;
-                    }
-
-                    .btn-primary,
-                    .btn-secondary {
-                        width: 100%;
-                    }
-                }
-            `}</style>
         </AuthenticatedLayout>
     );
 }

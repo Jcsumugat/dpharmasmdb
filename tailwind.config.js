@@ -14,9 +14,15 @@ export default {
             fontFamily: {
                 sans: ['Figtree', 'sans-serif'],
             },
+            spacing: {
+                '70': '17.5rem', // 280px for sidebar width
+                '22': '5.5rem',  // 88px for modal icon
+            },
             animation: {
                 'float': 'float 20s infinite linear',
                 'bounce-slow': 'bounce-slow 3s ease-in-out infinite',
+                'fade-in': 'fadeIn 0.2s ease',
+                'slide-up': 'slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
             },
             keyframes: {
                 float: {
@@ -28,9 +34,23 @@ export default {
                 'bounce-slow': {
                     '0%, 100%': { transform: 'translateY(0)' },
                     '50%': { transform: 'translateY(-10px)' },
-                }
-            }
+                },
+                fadeIn: {
+                    '0%': { opacity: '0' },
+                    '100%': { opacity: '1' },
+                },
+                slideUp: {
+                    '0%': {
+                        transform: 'translateY(30px) scale(0.95)',
+                        opacity: '0'
+                    },
+                    '100%': {
+                        transform: 'translateY(0) scale(1)',
+                        opacity: '1'
+                    },
+                },
+            },
         },
     },
-    plugins: [],
+    plugins: [forms],
 };

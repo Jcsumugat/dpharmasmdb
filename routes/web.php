@@ -47,18 +47,43 @@ Route::prefix('admin')->name('admin.')->group(function () {
             return Inertia::render('Admin/Products/Create');
         })->name('products.create');
 
-        Route::get('/suppliers', function () {
-            return Inertia::render('Admin/Suppliers/Index');
-        })->name('suppliers');
+        Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers');
 
         Route::get('/products', function () {
             return Inertia::render('Admin/Products/Index');
         })->name('products');
 
-        Route::get('/products', function () {
-            return Inertia::render('Admin/Products/Index');
-        })->name('products');
+        // In your web.php, replace the batch management route with this:
 
+        Route::get('/products/{id}/batches', function ($id) {
+            $product = \App\Models\Product::findOrFail($id);
+
+            // Fetch batches
+            $batches = [
+                'available_batches' => $product->getAvailableBatches(),
+                'expired_batches' => $product->getExpiredBatches(),
+                'summary' => [
+                    'total_available' => $product->getAvailableBatches()->sum('quantity_remaining'),
+                    'total_expired' => $product->getExpiredBatches()->sum('quantity_remaining'),
+                    'batch_count' => $product->getAvailableBatches()->count()
+                ]
+            ];
+
+            return Inertia::render('Admin/Products/BatchManagement', [
+                'product' => [
+                    'id' => (string) $product->_id,
+                    'product_name' => $product->product_name,
+                    'product_code' => $product->product_code,
+                    'stock_quantity' => $product->stock_quantity,
+                    'unit' => $product->unit,
+                    'unit_quantity' => $product->unit_quantity, // This was missing!
+                    'dosage_unit' => $product->dosage_unit,
+                    'supplier_id' => $product->supplier_id ? (string) $product->supplier_id : null,
+                ],
+                'batches' => $batches
+            ]);
+        })->name('products.batches');
+        
         Route::get('/orders', function () {
             return Inertia::render('Admin/Orders/Index');
         })->name('orders');
@@ -96,26 +121,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 ]);
             })->name('categories.index');
 
-            // Suppliers
-            Route::get('/suppliers', function () {
-                return response()->json([
-                    'success' => true,
-                    'suppliers' => []
-                ]);
-            })->name('suppliers.index');
-
-            // Suppliers
+            // Suppliers API routes
             Route::get('/suppliers', [SupplierController::class, 'apiIndex'])->name('suppliers.index');
             Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
             Route::put('/suppliers/{id}', [SupplierController::class, 'update'])->name('suppliers.update');
             Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
 
-
             // Products
             Route::apiResource('products', ProductController::class);
+            Route::post('/products/{id}/add-batch', [ProductController::class, 'addBatch'])->name('products.add-batch');
+            Route::put('/products/{productId}/batches/{batchId}', [ProductController::class, 'updateBatch'])->name('products.batches.update');
             Route::post('/products/{id}/add-stock', [ProductController::class, 'addStock'])->name('products.add-stock');
             Route::post('/products/{id}/adjust-stock', [ProductController::class, 'adjustStock'])->name('products.adjust-stock');
-            Route::get('/products/{id}/batches', [ProductController::class, 'getBatches'])->name('products.batches');
+            Route::get('/products/{id}/batches', [ProductController::class, 'getBatches'])->name('products.batches.api');
             Route::get('/products/{id}/stock-movements', [ProductController::class, 'getStockMovements'])->name('products.stock-movements');
 
             // Orders
@@ -180,7 +198,6 @@ Route::prefix('customer')->name('customer.')->group(function () {
 
         // API routes
         Route::prefix('api')->name('api.')->group(function () {
-
 
             // Products
             Route::get('/products', [ProductController::class, 'index'])->name('products.index');

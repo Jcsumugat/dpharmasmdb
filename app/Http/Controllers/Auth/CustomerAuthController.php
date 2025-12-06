@@ -45,7 +45,7 @@ class CustomerAuthController extends Controller
             'email' => $validated['email']
         ]);
 
-        return redirect()->route('signup.step_two');
+        return redirect()->route('customer.signup.step_two');
     }
 
     /**
@@ -56,7 +56,7 @@ class CustomerAuthController extends Controller
         $registration = session('registration');
 
         if (!$registration) {
-            return redirect()->route('signup.step_one')
+            return redirect()->route('customer.signup.step_one')
                 ->withErrors(['error' => 'Session expired. Please start over.']);
         }
 
@@ -84,7 +84,7 @@ class CustomerAuthController extends Controller
 
         if (!$registrationData) {
             Log::error('Registration data not found in session');
-            return redirect()->route('signup.step_one')
+            return redirect()->route('customer.signup.step_one')
                 ->withErrors(['error' => 'Session expired. Please start over.']);
         }
 
@@ -121,7 +121,7 @@ class CustomerAuthController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return redirect()->route('signup.step_two')
+            return redirect()->route('customer.signup.step_two')
                 ->withErrors(['error' => 'Registration failed: ' . $e->getMessage()]);
         }
     }
