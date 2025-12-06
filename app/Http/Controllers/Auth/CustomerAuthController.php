@@ -114,7 +114,6 @@ class CustomerAuthController extends Controller
 
             return redirect()->route('customer.login')
                 ->with('success', 'Registration successful! You can now log in.');
-
         } catch (\Exception $e) {
             Log::error('Customer registration failed', [
                 'error' => $e->getMessage(),
@@ -146,8 +145,8 @@ class CustomerAuthController extends Controller
 
         // Find user by phone (mobile)
         $user = User::where('phone', $credentials['mobile'])
-                   ->where('role', User::ROLE_CUSTOMER)
-                   ->first();
+            ->where('role', User::ROLE_CUSTOMER)
+            ->first();
 
         if (!$user) {
             return back()->withErrors([
@@ -215,7 +214,7 @@ class CustomerAuthController extends Controller
 
         return redirect()->intended(route('customer.home'));
     }
-
+    
     /**
      * Customer home/dashboard
      */
@@ -226,7 +225,32 @@ class CustomerAuthController extends Controller
                 ->with('error', 'Please log in to access this page.');
         }
 
-        return view('client.home');
+        $user = Auth::user();
+
+        // Get customer statistics
+        $stats = [
+            'prescriptions' => \App\Models\Prescription::where('customer_id', $user->_id)->count(),
+            'orders' => \App\Models\Order::where('customer_id', $user->_id)->count(),
+            'notifications' => \App\Models\Notification::where('user_id', $user->_id)
+                ->unread()
+                ->count(),
+            'messages' => 0, // You can add conversation/message count here
+            'recentActivity' => [] // You can add recent activity here
+        ];
+
+        // Get unread notifications count
+        $unreadNotifications = \App\Models\Notification::where('user_id', $user->_id)
+            ->unread()
+            ->count();
+
+        // Get unread messages count (if you have a conversation/message model)
+        $unreadMessages = 0;
+
+        return inertia('Customer/Home/Index', [
+            'stats' => $stats,
+            'unreadNotifications' => $unreadNotifications,
+            'unreadMessages' => $unreadMessages
+        ]);
     }
 
     /**

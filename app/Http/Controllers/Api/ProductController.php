@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\Category;
+use App\Services\NotificationService;
 use App\Models\StockMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -71,7 +72,7 @@ class ProductController extends Controller
                 'unit_quantity' => $savedProduct->unit_quantity,
                 'unit_quantity_type' => gettype($savedProduct->unit_quantity)
             ]);
-
+            NotificationService::notifyNewOrder($order);
             return response()->json([
                 'success' => true,
                 'message' => 'Product created successfully',
@@ -162,17 +163,27 @@ class ProductController extends Controller
             $query->where('category_id', $request->category_id);
         }
 
-        if ($request->has('stock_status')) {
+        if ($request->has('stock_status') && $request->stock_status !== 'all') {
             switch ($request->stock_status) {
-                case 'in_stock':
-                    $query->where('stock_quantity', '>', 0);
-                    break;
-                case 'low_stock':
-                    $query->whereRaw('stock_quantity <= reorder_level')
-                        ->where('stock_quantity', '>', 0);
-                    break;
                 case 'out_of_stock':
                     $query->where('stock_quantity', 0);
+                    break;
+                case 'low_stock':
+                    // Use MongoDB $expr to compare fields
+                    $query->where('stock_quantity', '>', 0)
+                        ->whereRaw([
+                            '$expr' => [
+                                '$lte' => ['$stock_quantity', '$reorder_level']
+                            ]
+                        ]);
+                    break;
+                case 'in_stock':
+                    // Stock is above reorder level
+                    $query->whereRaw([
+                        '$expr' => [
+                            '$gt' => ['$stock_quantity', '$reorder_level']
+                        ]
+                    ]);
                     break;
             }
         }

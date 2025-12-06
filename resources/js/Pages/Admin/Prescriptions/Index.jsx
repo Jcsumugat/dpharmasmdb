@@ -10,6 +10,13 @@ export default function PrescriptionsIndex() {
         order_type: '',
         search: ''
     });
+    const [stats, setStats] = useState({
+        total: 0,
+        pending: 0,
+        approved: 0,
+        completed: 0,
+        declined: 0
+    });
     const [pagination, setPagination] = useState({
         current_page: 1,
         last_page: 1,
@@ -21,9 +28,14 @@ export default function PrescriptionsIndex() {
     const [showApproveModal, setShowApproveModal] = useState(false);
     const [showDeclineModal, setShowDeclineModal] = useState(false);
     const [showImageModal, setShowImageModal] = useState(false);
+    const [showOrderStatusModal, setShowOrderStatusModal] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [declineReason, setDeclineReason] = useState('');
     const [approvalItems, setApprovalItems] = useState([]);
     const [adminMessage, setAdminMessage] = useState('');
+    const [orderStatus, setOrderStatus] = useState('');
+    const [paymentStatus, setPaymentStatus] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
 
     useEffect(() => {
@@ -36,7 +48,8 @@ export default function PrescriptionsIndex() {
             const params = new URLSearchParams({
                 page: pagination.current_page,
                 ...(filters.status && { status: filters.status }),
-                ...(filters.order_type && { order_type: filters.order_type })
+                ...(filters.order_type && { order_type: filters.order_type }),
+                ...(filters.search && { search: filters.search })
             });
 
             const response = await fetch(`/admin/api/prescriptions?${params}`);
@@ -50,6 +63,7 @@ export default function PrescriptionsIndex() {
                     per_page: data.prescriptions.per_page,
                     total: data.prescriptions.total
                 });
+                setStats(data.stats || stats);
             }
         } catch (error) {
             console.error('Failed to fetch prescriptions:', error);
@@ -68,9 +82,17 @@ export default function PrescriptionsIndex() {
         setPagination(prev => ({ ...prev, current_page: 1 }));
     };
 
-    const handleViewDetails = (prescription) => {
-        setSelectedPrescription(prescription);
-        setShowDetailsModal(true);
+    const handleViewDetails = async (prescription) => {
+        try {
+            const response = await fetch(`/admin/api/prescriptions/${prescription._id}`);
+            const data = await response.json();
+            if (data.success) {
+                setSelectedPrescription(data.prescription);
+                setShowDetailsModal(true);
+            }
+        } catch (error) {
+            console.error('Failed to fetch prescription details:', error);
+        }
     };
 
     const handleViewImage = (prescription) => {
@@ -80,7 +102,6 @@ export default function PrescriptionsIndex() {
 
     const handleInitiateApproval = (prescription) => {
         setSelectedPrescription(prescription);
-        // Initialize approval items if prescription already has items
         if (prescription.items && prescription.items.length > 0) {
             setApprovalItems(prescription.items);
         } else {
@@ -119,7 +140,6 @@ export default function PrescriptionsIndex() {
     const handleApprovePrescription = async () => {
         if (!selectedPrescription) return;
 
-        // Validate items
         const invalidItems = approvalItems.some(item =>
             !item.product_name || item.quantity < 1 || item.unit_price < 0
         );
@@ -131,7 +151,7 @@ export default function PrescriptionsIndex() {
 
         setActionLoading(true);
         try {
-            const response = await fetch(`/admin/api/prescriptions/${selectedPrescription._id}/approve`, {
+            const response = await fetch(`/admin/api/prescriptions/${selectedPrescription._id}/verify`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -150,7 +170,7 @@ export default function PrescriptionsIndex() {
                 setApprovalItems([]);
                 setAdminMessage('');
                 fetchPrescriptions();
-                alert('Prescription approved successfully!');
+                alert('Prescription approved and order created successfully!');
             } else {
                 alert(data.message || 'Failed to approve prescription');
             }
@@ -170,13 +190,13 @@ export default function PrescriptionsIndex() {
 
         setActionLoading(true);
         try {
-            const response = await fetch(`/admin/api/prescriptions/${selectedPrescription._id}/decline`, {
+            const response = await fetch(`/admin/api/prescriptions/${selectedPrescription._id}/reject`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
                 },
-                body: JSON.stringify({ admin_message: declineReason })
+                body: JSON.stringify({ reason: declineReason })
             });
 
             const data = await response.json();
@@ -186,7 +206,7 @@ export default function PrescriptionsIndex() {
                 setShowDetailsModal(false);
                 setDeclineReason('');
                 fetchPrescriptions();
-                alert('Prescription declined');
+                alert('Prescription declined successfully');
             } else {
                 alert(data.message || 'Failed to decline prescription');
             }
@@ -198,29 +218,134 @@ export default function PrescriptionsIndex() {
         }
     };
 
-    const handleCompletePrescription = async (prescriptionId) => {
-        if (!confirm('Mark this prescription as completed?')) return;
+    const handleUpdateOrderStatus = async () => {
+        if (!selectedPrescription || !orderStatus) return;
 
+        setActionLoading(true);
         try {
-            const response = await fetch(`/admin/api/prescriptions/${prescriptionId}/complete`, {
+            const response = await fetch(`/admin/api/prescriptions/${selectedPrescription._id}/update-order-status`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                }
+                },
+                body: JSON.stringify({ status: orderStatus })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setShowOrderStatusModal(false);
+                setOrderStatus('');
+                fetchPrescriptions();
+                alert('Order status updated successfully');
+            } else {
+                alert(data.message || 'Failed to update order status');
+            }
+        } catch (error) {
+            console.error('Error updating order status:', error);
+            alert('Failed to update order status');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleUpdatePaymentStatus = async () => {
+        if (!selectedPrescription || !paymentStatus) return;
+
+        setActionLoading(true);
+        try {
+            const response = await fetch(`/admin/api/prescriptions/${selectedPrescription._id}/update-payment-status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify({
+                    payment_status: paymentStatus,
+                    payment_method: paymentMethod || undefined
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setShowPaymentModal(false);
+                setPaymentStatus('');
+                setPaymentMethod('');
+                fetchPrescriptions();
+                alert('Payment status updated successfully');
+            } else {
+                alert(data.message || 'Failed to update payment status');
+            }
+        } catch (error) {
+            console.error('Error updating payment status:', error);
+            alert('Failed to update payment status');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleCompleteOrder = async (prescriptionId) => {
+        if (!confirm('Complete this order? This will reduce stock and mark as completed.')) return;
+
+        setActionLoading(true);
+        try {
+            const response = await fetch(`/admin/api/prescriptions/${prescriptionId}/complete-order`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify({ payment_method: 'cash' })
             });
 
             const data = await response.json();
 
             if (data.success) {
                 fetchPrescriptions();
-                alert('Prescription marked as completed');
+                setShowDetailsModal(false);
+                alert('Order completed successfully!');
             } else {
-                alert(data.message || 'Failed to complete prescription');
+                alert(data.message || 'Failed to complete order');
             }
         } catch (error) {
-            console.error('Error completing prescription:', error);
-            alert('Failed to complete prescription');
+            console.error('Error completing order:', error);
+            alert('Failed to complete order');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleCancelOrder = async (prescriptionId) => {
+        const reason = prompt('Please provide a reason for cancellation:');
+        if (!reason) return;
+
+        setActionLoading(true);
+        try {
+            const response = await fetch(`/admin/api/prescriptions/${prescriptionId}/cancel-order`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify({ reason })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                fetchPrescriptions();
+                setShowDetailsModal(false);
+                alert('Order cancelled successfully');
+            } else {
+                alert(data.message || 'Failed to cancel order');
+            }
+        } catch (error) {
+            console.error('Error cancelling order:', error);
+            alert('Failed to cancel order');
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -229,9 +354,31 @@ export default function PrescriptionsIndex() {
             pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
             approved: 'bg-green-100 text-green-800 border-green-200',
             declined: 'bg-red-100 text-red-800 border-red-200',
-            completed: 'bg-blue-100 text-blue-800 border-blue-200'
+            completed: 'bg-blue-100 text-blue-800 border-blue-200',
+            cancelled: 'bg-gray-100 text-gray-800 border-gray-200'
         };
         return badges[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+    };
+
+    const getOrderStatusBadge = (status) => {
+        const badges = {
+            pending: 'bg-yellow-100 text-yellow-800',
+            confirmed: 'bg-blue-100 text-blue-800',
+            processing: 'bg-purple-100 text-purple-800',
+            ready_for_pickup: 'bg-green-100 text-green-800',
+            completed: 'bg-green-600 text-white',
+            cancelled: 'bg-red-100 text-red-800'
+        };
+        return badges[status] || 'bg-gray-100 text-gray-800';
+    };
+
+    const getPaymentStatusBadge = (status) => {
+        const badges = {
+            pending: 'bg-yellow-100 text-yellow-800',
+            paid: 'bg-green-100 text-green-800',
+            failed: 'bg-red-100 text-red-800'
+        };
+        return badges[status] || 'bg-gray-100 text-gray-800';
     };
 
     const getTypeBadge = (type) => {
@@ -265,13 +412,37 @@ export default function PrescriptionsIndex() {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Prescriptions Management" />
+            <Head title="Prescriptions & Orders Management" />
 
             <div className="p-6 md:p-10 max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">Prescriptions Management</h1>
-                    <p className="text-gray-600">Review and manage customer prescription submissions</p>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">Prescriptions & Orders</h1>
+                    <p className="text-gray-600">Review prescriptions and manage orders from submission to completion</p>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div className="bg-white rounded-xl border border-gray-200 p-4">
+                        <p className="text-sm text-gray-600 mb-1">Total</p>
+                        <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                    </div>
+                    <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
+                        <p className="text-sm text-yellow-700 mb-1">Pending</p>
+                        <p className="text-2xl font-bold text-yellow-800">{stats.pending}</p>
+                    </div>
+                    <div className="bg-green-50 rounded-xl border border-green-200 p-4">
+                        <p className="text-sm text-green-700 mb-1">Approved</p>
+                        <p className="text-2xl font-bold text-green-800">{stats.approved}</p>
+                    </div>
+                    <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
+                        <p className="text-sm text-blue-700 mb-1">Completed</p>
+                        <p className="text-2xl font-bold text-blue-800">{stats.completed}</p>
+                    </div>
+                    <div className="bg-red-50 rounded-xl border border-red-200 p-4">
+                        <p className="text-sm text-red-700 mb-1">Declined</p>
+                        <p className="text-2xl font-bold text-red-800">{stats.declined}</p>
+                    </div>
                 </div>
 
                 {/* Filters */}
@@ -297,7 +468,7 @@ export default function PrescriptionsIndex() {
                                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                         }`}
                                 >
-                                    Pending
+                                    Pending Review
                                 </button>
                                 <button
                                     onClick={() => handleStatusFilter('approved')}
@@ -306,16 +477,7 @@ export default function PrescriptionsIndex() {
                                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                         }`}
                                 >
-                                    Approved
-                                </button>
-                                <button
-                                    onClick={() => handleStatusFilter('declined')}
-                                    className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.status === 'declined'
-                                            ? 'bg-red-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                        }`}
-                                >
-                                    Declined
+                                    Active Orders
                                 </button>
                                 <button
                                     onClick={() => handleStatusFilter('completed')}
@@ -325,6 +487,15 @@ export default function PrescriptionsIndex() {
                                         }`}
                                 >
                                     Completed
+                                </button>
+                                <button
+                                    onClick={() => handleStatusFilter('declined')}
+                                    className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.status === 'declined'
+                                            ? 'bg-red-600 text-white'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    Declined
                                 </button>
                             </div>
                         </div>
@@ -365,7 +536,7 @@ export default function PrescriptionsIndex() {
                     </div>
                 </div>
 
-                {/* Prescriptions List */}
+                {/* Prescriptions/Orders List */}
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                     {loading ? (
                         <div className="flex items-center justify-center py-20">
@@ -376,7 +547,7 @@ export default function PrescriptionsIndex() {
                             <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            <p className="text-gray-500 text-lg">No prescriptions found</p>
+                            <p className="text-gray-500 text-lg">No prescriptions/orders found</p>
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -387,7 +558,9 @@ export default function PrescriptionsIndex() {
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Customer</th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Order Status</th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Items</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Total</th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
                                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
                                     </tr>
@@ -402,7 +575,7 @@ export default function PrescriptionsIndex() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="text-sm font-medium text-gray-900">
-                                                    {prescription.customer?.name || 'N/A'}
+                                                    {prescription.customer?.first_name} {prescription.customer?.last_name}
                                                 </div>
                                                 <div className="text-xs text-gray-500">
                                                     {prescription.mobile_number}
@@ -419,9 +592,27 @@ export default function PrescriptionsIndex() {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
+                                                {prescription.order ? (
+                                                    <span className={`inline-flex px-2 py-1 rounded text-xs font-semibold ${getOrderStatusBadge(prescription.order.status)}`}>
+                                                        {prescription.order.status?.replace('_', ' ').toUpperCase()}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">No order</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4">
                                                 <span className="text-sm text-gray-900">
                                                     {prescription.items?.length || 0} items
                                                 </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {prescription.items?.length > 0 ? (
+                                                    <span className="text-sm font-semibold text-gray-900">
+                                                        {formatCurrency(calculateTotal(prescription.items))}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-sm text-gray-400">-</span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className="text-sm text-gray-600">
@@ -457,7 +648,7 @@ export default function PrescriptionsIndex() {
                             <div className="text-sm text-gray-600">
                                 Showing {((pagination.current_page - 1) * pagination.per_page) + 1} to{' '}
                                 {Math.min(pagination.current_page * pagination.per_page, pagination.total)} of{' '}
-                                {pagination.total} prescriptions
+                                {pagination.total} records
                             </div>
                             <div className="flex gap-2">
                                 <button
@@ -483,9 +674,12 @@ export default function PrescriptionsIndex() {
             {/* Details Modal */}
             {showDetailsModal && selectedPrescription && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                            <h2 className="text-xl font-bold text-gray-900">Prescription Details</h2>
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-900">Prescription & Order Details</h2>
+                                <p className="text-sm text-gray-600">{selectedPrescription.prescription_number}</p>
+                            </div>
                             <button
                                 onClick={() => setShowDetailsModal(false)}
                                 className="text-gray-400 hover:text-gray-600"
@@ -504,7 +698,7 @@ export default function PrescriptionsIndex() {
                                     <p className="font-mono font-bold text-gray-900">{selectedPrescription.prescription_number}</p>
                                 </div>
                                 <div>
-                                    <label className="text-sm font-semibold text-gray-600">Status</label>
+                                    <label className="text-sm font-semibold text-gray-600">Prescription Status</label>
                                     <p>
                                         <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(selectedPrescription.status)}`}>
                                             {selectedPrescription.status?.toUpperCase()}
@@ -513,7 +707,7 @@ export default function PrescriptionsIndex() {
                                 </div>
                                 <div>
                                     <label className="text-sm font-semibold text-gray-600">Customer</label>
-                                    <p className="text-gray-900">{selectedPrescription.customer?.name || 'N/A'}</p>
+                                    <p className="text-gray-900">{selectedPrescription.customer?.first_name} {selectedPrescription.customer?.last_name}</p>
                                     <p className="text-sm text-gray-500">{selectedPrescription.customer?.email || ''}</p>
                                 </div>
                                 <div>
@@ -534,6 +728,41 @@ export default function PrescriptionsIndex() {
                                 </div>
                             </div>
 
+                            {/* Order Info (if exists) */}
+                            {selectedPrescription.order && (
+                                <div className="border-t pt-6">
+                                    <h3 className="text-lg font-bold text-gray-900 mb-4">Order Information</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-sm font-semibold text-gray-600">Order Status</label>
+                                            <p>
+                                                <span className={`inline-flex px-3 py-1 rounded text-xs font-semibold ${getOrderStatusBadge(selectedPrescription.order.status)}`}>
+                                                    {selectedPrescription.order.status?.replace('_', ' ').toUpperCase()}
+                                                </span>
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-semibold text-gray-600">Payment Status</label>
+                                            <p>
+                                                <span className={`inline-flex px-3 py-1 rounded text-xs font-semibold ${getPaymentStatusBadge(selectedPrescription.order.payment_status)}`}>
+                                                    {selectedPrescription.order.payment_status?.toUpperCase()}
+                                                </span>
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-semibold text-gray-600">Payment Method</label>
+                                            <p className="text-gray-900">{selectedPrescription.order.payment_method?.toUpperCase() || 'Not set'}</p>
+                                        </div>
+                                        {selectedPrescription.order.completed_at && (
+                                            <div>
+                                                <label className="text-sm font-semibold text-gray-600">Completed At</label>
+                                                <p className="text-gray-900">{formatDate(selectedPrescription.order.completed_at)}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Notes */}
                             {selectedPrescription.notes && (
                                 <div>
@@ -553,7 +782,7 @@ export default function PrescriptionsIndex() {
                             {/* Items */}
                             {selectedPrescription.items && selectedPrescription.items.length > 0 && (
                                 <div>
-                                    <h3 className="text-lg font-bold text-gray-900 mb-3">Prescription Items</h3>
+                                    <h3 className="text-lg font-bold text-gray-900 mb-3">Order Items</h3>
                                     <div className="space-y-2">
                                         {selectedPrescription.items.map((item, index) => (
                                             <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
@@ -585,43 +814,86 @@ export default function PrescriptionsIndex() {
                             {/* File Info */}
                             <div>
                                 <label className="text-sm font-semibold text-gray-600 block mb-2">Prescription File</label>
-                                <div className="bg-gray-50 p-3 rounded-lg">
-                                    <p className="text-sm text-gray-900">{selectedPrescription.original_filename}</p>
-                                    <p className="text-xs text-gray-500">{(selectedPrescription.file_size / 1024).toFixed(2)} KB</p>
+                                <div className="bg-gray-50 p-3 rounded-lg flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-gray-900">{selectedPrescription.original_filename}</p>
+                                        <p className="text-xs text-gray-500">{(selectedPrescription.file_size / 1024).toFixed(2)} KB</p>
+                                    </div>
+                                    <button
+                                        onClick={() => handleViewImage(selectedPrescription)}
+                                        className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                                    >
+                                        View File
+                                    </button>
                                 </div>
                             </div>
 
                             {/* Actions */}
-                            {selectedPrescription.status === 'pending' && (
-                                <div className="flex gap-3 pt-4 border-t">
-                                    <button
-                                        onClick={() => handleInitiateApproval(selectedPrescription)}
-                                        className="flex-1 px-4 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-colors"
-                                    >
-                                        Approve
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowDetailsModal(false);
-                                            setShowDeclineModal(true);
-                                        }}
-                                        className="flex-1 px-4 py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-colors"
-                                    >
-                                        Decline
-                                    </button>
-                                </div>
-                            )}
+                            <div className="pt-4 border-t space-y-3">
+                                {selectedPrescription.status === 'pending' && (
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => handleInitiateApproval(selectedPrescription)}
+                                            className="flex-1 px-4 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-colors"
+                                        >
+                                            Approve & Create Order
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setShowDetailsModal(false);
+                                                setShowDeclineModal(true);
+                                            }}
+                                            className="flex-1 px-4 py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-colors"
+                                        >
+                                            Decline
+                                        </button>
+                                    </div>
+                                )}
 
-                            {selectedPrescription.status === 'approved' && (
-                                <div className="pt-4 border-t">
-                                    <button
-                                        onClick={() => handleCompletePrescription(selectedPrescription._id)}
-                                        className="w-full px-4 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors"
-                                    >
-                                        Mark as Completed
-                                    </button>
-                                </div>
-                            )}
+                                {selectedPrescription.status === 'approved' && selectedPrescription.order && (
+                                    <>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    setOrderStatus(selectedPrescription.order.status);
+                                                    setShowOrderStatusModal(true);
+                                                }}
+                                                className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700"
+                                            >
+                                                Update Order Status
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setPaymentStatus(selectedPrescription.order.payment_status);
+                                                    setPaymentMethod(selectedPrescription.order.payment_method || '');
+                                                    setShowPaymentModal(true);
+                                                }}
+                                                className="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700"
+                                            >
+                                                Update Payment
+                                            </button>
+                                        </div>
+                                        {selectedPrescription.order.status !== 'completed' && (
+                                            <div className="flex gap-3">
+                                                <button
+                                                    onClick={() => handleCompleteOrder(selectedPrescription._id)}
+                                                    disabled={actionLoading}
+                                                    className="flex-1 px-4 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50"
+                                                >
+                                                    Complete Order
+                                                </button>
+                                                <button
+                                                    onClick={() => handleCancelOrder(selectedPrescription._id)}
+                                                    disabled={actionLoading}
+                                                    className="flex-1 px-4 py-3 bg-gray-600 text-white font-semibold rounded-xl hover:bg-gray-700 disabled:opacity-50"
+                                                >
+                                                    Cancel Order
+                                                </button>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -632,7 +904,7 @@ export default function PrescriptionsIndex() {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
-                            <h2 className="text-xl font-bold text-gray-900">Approve Prescription</h2>
+                            <h2 className="text-xl font-bold text-gray-900">Approve Prescription & Create Order</h2>
                             <p className="text-sm text-gray-600">{selectedPrescription.prescription_number}</p>
                         </div>
 
@@ -640,7 +912,7 @@ export default function PrescriptionsIndex() {
                             {/* Items List */}
                             <div>
                                 <div className="flex justify-between items-center mb-3">
-                                    <label className="text-sm font-semibold text-gray-700">Prescription Items</label>
+                                    <label className="text-sm font-semibold text-gray-700">Order Items</label>
                                     <button
                                         onClick={handleAddItem}
                                         className="px-3 py-1 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
@@ -750,7 +1022,7 @@ export default function PrescriptionsIndex() {
                                     disabled={actionLoading}
                                     className="flex-1 px-4 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50"
                                 >
-                                    {actionLoading ? 'Approving...' : 'Approve Prescription'}
+                                    {actionLoading ? 'Approving...' : 'Approve & Create Order'}
                                 </button>
                             </div>
                         </div>
@@ -767,7 +1039,7 @@ export default function PrescriptionsIndex() {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Reason for Declining
+                                    Reason for Declining *
                                 </label>
                                 <textarea
                                     value={declineReason}
@@ -801,6 +1073,102 @@ export default function PrescriptionsIndex() {
                 </div>
             )}
 
+            {/* Order Status Update Modal */}
+            {showOrderStatusModal && selectedPrescription && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6">
+                        <h2 className="text-xl font-bold text-gray-900 mb-4">Update Order Status</h2>
+                        <p className="text-sm text-gray-600 mb-4">Order #{selectedPrescription.order?.order_id}</p>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Order Status</label>
+                                <select
+                                    value={orderStatus}
+                                    onChange={(e) => setOrderStatus(e.target.value)}
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
+                                >
+                                    <option value="pending">Pending</option>
+                                    <option value="confirmed">Confirmed</option>
+                                    <option value="processing">Processing</option>
+                                    <option value="ready_for_pickup">Ready for Pickup</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowOrderStatusModal(false)}
+                                    disabled={actionLoading}
+                                    className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl font-semibold hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleUpdateOrderStatus}
+                                    disabled={actionLoading}
+                                    className="flex-1 px-4 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {actionLoading ? 'Updating...' : 'Update Status'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Payment Status Update Modal */}
+            {showPaymentModal && selectedPrescription && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6">
+                        <h2 className="text-xl font-bold text-gray-900 mb-4">Update Payment Status</h2>
+                        <p className="text-sm text-gray-600 mb-4">Order #{selectedPrescription.order?.order_id}</p>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Status</label>
+                                <select
+                                    value={paymentStatus}
+                                    onChange={(e) => setPaymentStatus(e.target.value)}
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
+                                >
+                                    <option value="pending">Pending</option>
+                                    <option value="paid">Paid</option>
+                                    <option value="failed">Failed</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Method</label>
+                                <select
+                                    value={paymentMethod}
+                                    onChange={(e) => setPaymentMethod(e.target.value)}
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
+                                >
+                                    <option value="">Select method...</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="card">Card</option>
+                                    <option value="gcash">GCash</option>
+                                </select>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowPaymentModal(false)}
+                                    disabled={actionLoading}
+                                    className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl font-semibold hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleUpdatePaymentStatus}
+                                    disabled={actionLoading}
+                                    className="flex-1 px-4 py-3 bg-purple-600 text-white font-semibold rounded-xl hover:bg-purple-700 disabled:opacity-50"
+                                >
+                                    {actionLoading ? 'Updating...' : 'Update Payment'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Image Modal */}
             {showImageModal && selectedPrescription && (
                 <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
@@ -818,13 +1186,13 @@ export default function PrescriptionsIndex() {
                             <div className="bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center" style={{ minHeight: '500px' }}>
                                 {selectedPrescription.file_mime_type?.includes('pdf') ? (
                                     <iframe
-                                        src={`/admin/api/prescriptions/${selectedPrescription._id}/file`}
+                                        src={`/admin/api/prescriptions/${selectedPrescription._id}/download`}
                                         className="w-full h-[600px]"
                                         title="Prescription PDF"
                                     />
                                 ) : (
                                     <img
-                                        src={`/admin/api/prescriptions/${selectedPrescription._id}/file`}
+                                        src={`/storage/${selectedPrescription.file_path}`}
                                         alt="Prescription"
                                         className="max-w-full max-h-[600px] object-contain"
                                     />

@@ -3,7 +3,6 @@
 use App\Http\Controllers\Auth\AdminAuthController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Api\ProductController;
-use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\ConversationController;
@@ -68,7 +67,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/products/{id}/batches', function ($id) {
             $product = \App\Models\Product::findOrFail($id);
 
-            // Fetch batches
             $batches = [
                 'available_batches' => $product->getAvailableBatches(),
                 'expired_batches' => $product->getExpiredBatches(),
@@ -86,7 +84,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                     'product_code' => $product->product_code,
                     'stock_quantity' => $product->stock_quantity,
                     'unit' => $product->unit,
-                    'unit_quantity' => $product->unit_quantity, // This was missing!
+                    'unit_quantity' => $product->unit_quantity,
                     'dosage_unit' => $product->dosage_unit,
                     'supplier_id' => $product->supplier_id ? (string) $product->supplier_id : null,
                 ],
@@ -94,13 +92,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ]);
         })->name('products.batches');
 
-        Route::get('/orders', function () {
-            return Inertia::render('Admin/Orders/Index');
-        })->name('orders');
-
+        // Prescriptions page (now handles orders too)
         Route::get('/prescriptions', function () {
             return Inertia::render('Admin/Prescriptions/Index');
         })->name('prescriptions');
+
+        Route::get('/prescriptions/{id}', function ($id) {
+            return Inertia::render('Admin/Prescriptions/Detail');
+        })->name('prescriptions.detail');
+
+        // Notifications page
+        Route::get('/notifications', function () {
+            return Inertia::render('Admin/Notifications/Index');
+        })->name('notifications');
 
         Route::get('/customers', function () {
             return Inertia::render('Admin/Customers/Index');
@@ -146,17 +150,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/products/{id}/batches', [ProductController::class, 'getBatches'])->name('products.batches.api');
             Route::get('/products/{id}/stock-movements', [ProductController::class, 'getStockMovements'])->name('products.stock-movements');
 
-            // Orders
-            Route::apiResource('orders', OrderController::class)->only(['index', 'show', 'update']);
-            Route::post('/orders/{id}/update-status', [OrderController::class, 'updateStatus'])->name('orders.update-status');
-            Route::post('/orders/{id}/process-payment', [OrderController::class, 'processPayment'])->name('orders.process-payment');
-            Route::get('/orders/{id}/timeline', [OrderController::class, 'getTimeline'])->name('orders.timeline');
-
-            // Prescriptions
-            Route::apiResource('prescriptions', PrescriptionController::class)->only(['index', 'show', 'update']);
+            // Prescriptions (now includes order management)
+            Route::get('/prescriptions', [PrescriptionController::class, 'index'])->name('prescriptions.index');
+            Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show'])->name('prescriptions.show');
             Route::post('/prescriptions/{id}/verify', [PrescriptionController::class, 'verify'])->name('prescriptions.verify');
             Route::post('/prescriptions/{id}/reject', [PrescriptionController::class, 'reject'])->name('prescriptions.reject');
             Route::get('/prescriptions/{id}/download', [PrescriptionController::class, 'download'])->name('prescriptions.download');
+            
+            // Order management through prescriptions
+            Route::post('/prescriptions/{id}/complete-order', [PrescriptionController::class, 'completeOrder'])->name('prescriptions.complete-order');
+            Route::post('/prescriptions/{id}/cancel-order', [PrescriptionController::class, 'cancelOrder'])->name('prescriptions.cancel-order');
+            Route::post('/prescriptions/{id}/update-order-status', [PrescriptionController::class, 'updateOrderStatus'])->name('prescriptions.update-order-status');
+            Route::post('/prescriptions/{id}/update-payment-status', [PrescriptionController::class, 'updatePaymentStatus'])->name('prescriptions.update-payment-status');
+            Route::get('/prescriptions/{id}/timeline', [PrescriptionController::class, 'getOrderTimeline'])->name('prescriptions.timeline');
 
             // Customers
             Route::apiResource('customers', CustomerController::class);
@@ -172,9 +178,16 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
             // Notifications
             Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+            Route::get('/notifications/unread-count', [NotificationController::class, 'getUnreadCount'])->name('notifications.unread-count');
+            Route::get('/notifications/recent', [NotificationController::class, 'getRecent'])->name('notifications.recent');
+            Route::get('/notifications/stats', [NotificationController::class, 'getStats'])->name('notifications.stats');
             Route::post('/notifications/{id}/mark-read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
+            Route::post('/notifications/{id}/mark-unread', [NotificationController::class, 'markAsUnread'])->name('notifications.mark-unread');
             Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+            Route::post('/notifications/mark-multiple-read', [NotificationController::class, 'markMultipleAsRead'])->name('notifications.mark-multiple-read');
             Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+            Route::post('/notifications/delete-multiple', [NotificationController::class, 'destroyMultiple'])->name('notifications.delete-multiple');
+            Route::delete('/notifications/delete-all-read', [NotificationController::class, 'deleteAllRead'])->name('notifications.delete-all-read');
         });
     });
 });
@@ -204,6 +217,21 @@ Route::prefix('customer')->name('customer.')->group(function () {
         Route::get('/profile', [CustomerAuthController::class, 'profile'])->name('profile');
         Route::put('/profile', [CustomerAuthController::class, 'updateProfile'])->name('profile.update');
         Route::post('/profile/change-password', [CustomerAuthController::class, 'changePassword'])->name('profile.change-password');
+        
+        // Prescriptions/Orders page
+        Route::get('/prescriptions', function () {
+            return Inertia::render('Customer/Prescriptions/Index');
+        })->name('prescriptions');
+
+        Route::get('/prescriptions/{id}', function ($id) {
+            return Inertia::render('Customer/Prescriptions/Detail');
+        })->name('prescriptions.detail');
+        
+        // Notifications page
+        Route::get('/notifications', function () {
+            return Inertia::render('Customer/Notifications/Index');
+        })->name('notifications');
+        
         Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('logout');
 
         // API routes
@@ -214,16 +242,12 @@ Route::prefix('customer')->name('customer.')->group(function () {
             Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
             Route::get('/products/search/{query}', [ProductController::class, 'search'])->name('products.search');
 
-            // Orders
-            Route::get('/orders', [OrderController::class, 'customerOrders'])->name('orders.index');
-            Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');
-            Route::get('/orders/{id}', [OrderController::class, 'show'])->name('orders.show');
-            Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
-
-            // Prescriptions
+            // Prescriptions (now includes order management for customer)
             Route::get('/prescriptions', [PrescriptionController::class, 'customerPrescriptions'])->name('prescriptions.index');
             Route::post('/prescriptions', [PrescriptionController::class, 'store'])->name('prescriptions.store');
             Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show'])->name('prescriptions.show');
+            Route::post('/prescriptions/{id}/cancel-order', [PrescriptionController::class, 'cancelOrder'])->name('prescriptions.cancel-order');
+            Route::get('/prescriptions/{id}/timeline', [PrescriptionController::class, 'getOrderTimeline'])->name('prescriptions.timeline');
 
             // Conversations
             Route::get('/conversations', [ConversationController::class, 'customerConversations'])->name('conversations.index');
@@ -233,7 +257,12 @@ Route::prefix('customer')->name('customer.')->group(function () {
 
             // Notifications
             Route::get('/notifications', [NotificationController::class, 'customerNotifications'])->name('notifications.index');
+            Route::get('/notifications/unread-count', [NotificationController::class, 'getUnreadCount'])->name('notifications.unread-count');
+            Route::get('/notifications/recent', [NotificationController::class, 'getRecent'])->name('notifications.recent');
             Route::post('/notifications/{id}/mark-read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
+            Route::post('/notifications/{id}/mark-unread', [NotificationController::class, 'markAsUnread'])->name('notifications.mark-unread');
+            Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+            Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
         });
     });
 });

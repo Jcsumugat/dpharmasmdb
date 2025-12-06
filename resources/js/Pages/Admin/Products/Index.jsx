@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Head, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { Trash2, ClipboardList, Edit } from 'lucide-react';
 
 export default function Products() {
     const [products, setProducts] = useState([]);
@@ -65,27 +66,62 @@ export default function Products() {
         router.visit(`/admin/products/${productId}/edit`);
     };
 
-    const handleDeleteProduct = async (productId) => {
-        if (!confirm('Are you sure you want to delete this product?')) return;
+    const handleDeleteProduct = async (product) => {
+        // Check if product has stock
+        if (product.stock_quantity > 0) {
+            if (!confirm(
+                `Warning: "${product.product_name}" has ${product.stock_quantity} units in stock.\n\n` +
+                `You must reduce stock to 0 before deleting this product.\n\n` +
+                `Would you like to manage batches instead?`
+            )) return;
+
+            // Redirect to batch management
+            handleManageBatches(product);
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete "${product.product_name}"?`)) return;
 
         try {
+            let productId = null;
+
+            if (product._id) {
+                if (typeof product._id === 'object' && product._id.$oid) {
+                    productId = product._id.$oid;
+                } else {
+                    productId = String(product._id);
+                }
+            } else if (product.id) {
+                productId = String(product.id);
+            }
+
+            if (!productId) {
+                throw new Error('Product ID not found');
+            }
+
             const response = await fetch(`/admin/api/products/${productId}`, {
                 method: 'DELETE',
                 headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                }
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
             });
 
             const data = await response.json();
 
+            if (!response.ok) {
+                throw new Error(data.message || `HTTP error! status: ${response.status}`);
+            }
+
             if (data.success) {
                 fetchProducts();
+                alert('Product deleted successfully');
             } else {
                 alert(data.message || 'Failed to delete product');
             }
         } catch (error) {
             console.error('Failed to delete product:', error);
-            alert('Failed to delete product');
+            alert('Failed to delete product: ' + error.message);
         }
     };
 
@@ -229,7 +265,9 @@ export default function Products() {
                                             <div className="flex justify-between items-center text-xs">
                                                 <span className="text-gray-600">Reorder at: {product.reorder_level}</span>
                                                 {product.batch_count > 0 && (
-                                                    <span className="text-indigo-600 font-semibold">{product.batch_count} batches</span>
+                                                    <span className="text-indigo-600 font-semibold">
+                                                        {product.batch_count} {product.batch_count === 1 ? 'batch' : 'batches'}
+                                                    </span>
                                                 )}
                                             </div>
                                         </div>
@@ -245,34 +283,33 @@ export default function Products() {
                                         View Details
                                     </button>
                                     <div className="flex gap-2">
-                                        <button
-                                            className="w-9 h-9 flex items-center justify-center bg-white border-2 border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-600 transition-all"
-                                            title="Manage Batches"
-                                            onClick={() => handleManageBatches(product)}
-                                        >
-                                            <svg viewBox="0 0 24 24" fill="none" className="w-4.5 h-4.5">
-                                                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                            </svg>
-                                        </button>
-                                        <button
-                                            className="w-9 h-9 flex items-center justify-center bg-white border-2 border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-600 transition-all"
-                                            title="Edit"
-                                            onClick={() => handleEditProduct(product)}
-                                        >
-                                            <svg viewBox="0 0 24 24" fill="none" className="w-4.5 h-4.5">
-                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                            </svg>
-                                        </button>
-                                        <button
-                                            className="w-9 h-9 flex items-center justify-center bg-white border-2 border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:border-red-500 hover:text-red-600 transition-all"
-                                            title="Delete"
-                                            onClick={() => handleDeleteProduct(product._id)}
-                                        >
-                                            <svg viewBox="0 0 24 24" fill="none" className="w-4.5 h-4.5">
-                                                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                            </svg>
-                                        </button>
+                                        <div className="flex gap-2">
+                                            <button
+                                                className="w-9 h-9 flex items-center justify-center bg-white border-2 border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-600 transition-all"
+                                                title="Manage Batches"
+                                                onClick={() => handleManageBatches(product)}
+                                            >
+                                                <ClipboardList className="w-4.5 h-4.5" />
+                                            </button>
+                                            <button
+                                                className="w-9 h-9 flex items-center justify-center bg-white border-2 border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:border-indigo-500 hover:text-indigo-600 transition-all"
+                                                title="Edit"
+                                                onClick={() => handleEditProduct(product)}
+                                            >
+                                                <Edit className="w-4.5 h-4.5" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteProduct(product)}
+                                                disabled={product.stock_quantity > 0}
+                                                className={`w-9 h-9 flex items-center justify-center border-2 rounded-lg transition-all ${product.stock_quantity > 0
+                                                    ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-white border-gray-200 text-red-600 hover:bg-red-50 hover:border-red-500'
+                                                    }`}
+                                                title={product.stock_quantity > 0 ? 'Cannot delete product with stock' : 'Delete'}
+                                            >
+                                                <Trash2 className="w-4.5 h-4.5" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

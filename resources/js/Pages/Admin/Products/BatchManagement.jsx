@@ -2,18 +2,17 @@ import { useState, useEffect } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
+import { Eye } from 'lucide-react';
 
 export default function BatchManagement({ product, batches, suppliers = [] }) {
-    console.log('Component loaded with product:', product);
-    console.log('Product unit_quantity:', product?.unit_quantity, 'Type:', typeof product?.unit_quantity);
-    console.log('Product ID fields:', { id: product?.id, _id: product?._id });
-    console.log('Sample batch:', batches?.available_batches?.[0]);
 
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [editingBatch, setEditingBatch] = useState(null);
     const [loading, setLoading] = useState(false);
     const [overrideUnit, setOverrideUnit] = useState(false);
+    const [viewingBatch, setViewingBatch] = useState(null);
     const [packageQuantity, setPackageQuantity] = useState('');
     const [calculatedQuantity, setCalculatedQuantity] = useState(0);
 
@@ -49,9 +48,6 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
     };
 
     const openEditModal = (batch) => {
-        console.log('Opening edit modal for batch:', batch);
-        console.log('Batch ID fields:', { id: batch?.id, _id: batch?._id, $id: batch?.$id });
-
         setEditingBatch(batch);
         setData({
             expiration_date: batch.expiration_date?.split('T')[0] || '',
@@ -70,6 +66,16 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
         clearErrors();
     };
 
+    const openDetailsModal = (batch) => {
+        setViewingBatch(batch);
+        setShowDetailsModal(true);
+    };
+
+    const closeDetailsModal = () => {
+        setShowDetailsModal(false);
+        setViewingBatch(null);
+    };
+
     const handlePackageQuantityChange = (value) => {
         setPackageQuantity(value);
 
@@ -80,7 +86,6 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
         }
 
         const pkgQty = parseFloat(value);
-        console.log('Package quantity changed:', value, 'Parsed:', pkgQty);
 
         if (isNaN(pkgQty)) {
             setCalculatedQuantity(0);
@@ -96,15 +101,12 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
             unitQty = parseFloat(product.unit_quantity);
         }
 
-        console.log('Unit quantity:', unitQty, 'Type:', typeof unitQty);
 
         if (unitQty && !isNaN(unitQty) && unitQty > 0) {
             const calculated = pkgQty * unitQty;
-            console.log('Calculation:', pkgQty, '×', unitQty, '=', calculated);
             setCalculatedQuantity(calculated);
             setData('quantity_received', calculated.toString());
         } else {
-            console.log('Invalid unit quantity');
             setCalculatedQuantity(0);
             setData('quantity_received', '');
         }
@@ -127,11 +129,6 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
 
     const handleAddBatch = async (e) => {
         e.preventDefault();
-
-        console.log('Form data:', data);
-        console.log('Package quantity:', packageQuantity);
-        console.log('Calculated quantity:', calculatedQuantity);
-
         if (!packageQuantity || packageQuantity === '' || isNaN(parseFloat(packageQuantity))) {
             alert('Please enter how many packages/units you received.');
             return;
@@ -160,8 +157,6 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
                 submitData.unit = data.unit;
                 submitData.unit_quantity = parseFloat(data.unit_quantity);
             }
-
-            console.log('Submitting batch data:', submitData);
 
             // Use the correct product ID
             const productId = product.id || product._id;
@@ -307,8 +302,13 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
         return null;
     };
 
-    const availableBatches = batches?.available_batches || [];
-    const expiredBatches = batches?.expired_batches || [];
+    const availableBatches = Array.isArray(batches?.available_batches)
+        ? batches.available_batches
+        : (batches?.available_batches?.data || []);
+
+    const expiredBatches = Array.isArray(batches?.expired_batches)
+        ? batches.expired_batches
+        : (batches?.expired_batches?.data || []);
 
     return (
         <AuthenticatedLayout>
@@ -415,12 +415,22 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
                                                 {batch.batch_number}
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => openEditModal(batch)}
-                                            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
-                                        >
-                                            ✏️
-                                        </button>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => openDetailsModal(batch)}
+                                                className="p-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition"
+                                                title="View Details"
+                                            >
+                                                <Eye className="w-4 h-4 text-blue-600" />
+                                            </button>
+                                            <button
+                                                onClick={() => openEditModal(batch)}
+                                                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                                                title="Edit"
+                                            >
+                                                ✏️
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="space-y-3">
@@ -786,6 +796,117 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
                 </div>
             </Modal>
 
+            {/* Batch Details Modal */}
+            <Modal show={showDetailsModal} onClose={closeDetailsModal} maxWidth="2xl">
+                <div className="bg-white">
+                    <div className="px-8 py-6 border-b-2 border-gray-100 flex justify-between items-center">
+                        <h2 className="text-2xl font-bold text-gray-900">Batch Details</h2>
+                        <button
+                            onClick={closeDetailsModal}
+                            className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full text-xl text-gray-600 transition"
+                        >
+                            &times;
+                        </button>
+                    </div>
+
+                    {viewingBatch && (
+                        <div className="p-8 space-y-6">
+                            {/* Batch Header */}
+                            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-200">
+                                <div className="text-sm text-indigo-600 font-medium mb-2">Batch Number</div>
+                                <div className="text-3xl font-bold text-indigo-900">{viewingBatch.batch_number}</div>
+                                <div className={`inline-block mt-3 px-3 py-1 rounded-lg text-xs font-semibold ${getExpiryStatus(viewingBatch.expiration_date) === 'good'
+                                        ? 'bg-green-100 text-green-800'
+                                        : getExpiryStatus(viewingBatch.expiration_date) === 'warning'
+                                            ? 'bg-amber-100 text-amber-800'
+                                            : getExpiryStatus(viewingBatch.expiration_date) === 'expiring-soon'
+                                                ? 'bg-red-100 text-red-800'
+                                                : 'bg-gray-100 text-gray-800'
+                                    }`}>
+                                    {getExpiryStatus(viewingBatch.expiration_date) === 'expired' ? 'Expired' :
+                                        getExpiryStatus(viewingBatch.expiration_date) === 'expiring-soon' ? 'Expiring Soon' :
+                                            getExpiryStatus(viewingBatch.expiration_date) === 'warning' ? 'Warning' : 'Good'}
+                                </div>
+                            </div>
+
+                            {/* Quantity Information */}
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 mb-4">Quantity Information</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                                        <div className="text-xs text-blue-600 font-medium mb-1">Quantity Received</div>
+                                        <div className="text-2xl font-bold text-blue-900">{viewingBatch.quantity_received}</div>
+                                    </div>
+                                    <div className="p-4 bg-green-50 rounded-xl border border-green-200">
+                                        <div className="text-xs text-green-600 font-medium mb-1">Quantity Remaining</div>
+                                        <div className="text-2xl font-bold text-green-900">{viewingBatch.quantity_remaining}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Dates */}
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 mb-4">Important Dates</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                                        <div className="text-xs text-gray-600 font-medium mb-1">Received Date</div>
+                                        <div className="text-base font-semibold text-gray-900">{formatDate(viewingBatch.received_date)}</div>
+                                    </div>
+                                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                                        <div className="text-xs text-gray-600 font-medium mb-1">Expiration Date</div>
+                                        <div className="text-base font-semibold text-gray-900">{formatDate(viewingBatch.expiration_date)}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Pricing */}
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 mb-4">Pricing</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                                        <div className="text-xs text-gray-600 font-medium mb-1">Unit Cost</div>
+                                        <div className="text-xl font-bold text-gray-900">₱{viewingBatch.unit_cost}</div>
+                                    </div>
+                                    <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+                                        <div className="text-xs text-emerald-600 font-medium mb-1">Sale Price</div>
+                                        <div className="text-xl font-bold text-emerald-900">₱{viewingBatch.sale_price}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Notes */}
+                            {viewingBatch.notes && (
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900 mb-4">Notes</h3>
+                                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                                        <p className="text-sm text-gray-700">{viewingBatch.notes}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Action Button */}
+                            <div className="flex gap-3 pt-4 border-t border-gray-200">
+                                <button
+                                    onClick={() => {
+                                        closeDetailsModal();
+                                        openEditModal(viewingBatch);
+                                    }}
+                                    className="flex-1 px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-semibold hover:shadow-lg transition"
+                                >
+                                    Edit Batch
+                                </button>
+                                <button
+                                    onClick={closeDetailsModal}
+                                    className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </Modal>
+
             {/* Edit Batch Modal */}
             <Modal show={showEditModal} onClose={closeEditModal} maxWidth="2xl">
                 <div className="bg-white">
@@ -881,6 +1002,7 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
                     </form>
                 </div>
             </Modal>
+
         </AuthenticatedLayout>
     );
 }

@@ -14,9 +14,9 @@ export default function AuthenticatedLayout({ children }) {
         { name: 'Dashboard', href: 'admin.dashboard', icon: '📊' },
         { name: 'Suppliers', href: 'admin.suppliers', icon: '📦' },
         { name: 'Products', href: 'admin.products', icon: '💊' },
-        { name: 'Orders', href: 'admin.orders', icon: '🛒' },
         { name: 'Prescriptions', href: 'admin.prescriptions', icon: '📋' },
         { name: 'Customers', href: 'admin.customers', icon: '👥' },
+        { name: 'Notifications', href: 'admin.notifications', icon: '🔔' },
         { name: 'Conversations', href: 'admin.conversations', icon: '💬' },
         { name: 'Reports', href: 'admin.reports', icon: '📈' },
     ];
@@ -38,7 +38,7 @@ export default function AuthenticatedLayout({ children }) {
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white flex-shrink-0 shadow-lg border border-white/20">
                             <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
-                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 2.18l8 3.6v8.55c0 4.55-3.08 8.8-8 9.93-4.92-1.13-8-5.38-8-9.93V7.78l8-3.6zM11 11v6h2v-6h-2zm0-4v2h2V7h-2z"/>
+                                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 2.18l8 3.6v8.55c0 4.55-3.08 8.8-8 9.93-4.92-1.13-8-5.38-8-9.93V7.78l8-3.6zM11 11v6h2v-6h-2zm0-4v2h2V7h-2z" />
                             </svg>
                         </div>
                         {isSidebarOpen && (
@@ -58,11 +58,10 @@ export default function AuthenticatedLayout({ children }) {
                             <Link
                                 key={item.name}
                                 href={route(item.href)}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-white/85 transition-all duration-200 font-medium relative group ${
-                                    isActive(item.href)
-                                        ? 'bg-white/25 text-white shadow-lg backdrop-blur-sm'
-                                        : 'hover:bg-white/15 hover:text-white hover:translate-x-1'
-                                }`}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-white/85 transition-all duration-200 font-medium relative group ${isActive(item.href)
+                                    ? 'bg-white/25 text-white shadow-lg backdrop-blur-sm'
+                                    : 'hover:bg-white/15 hover:text-white hover:translate-x-1'
+                                    }`}
                             >
                                 {isActive(item.href) && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-3/5 bg-white rounded-r" />}
                                 <span className="text-xl min-w-[28px] flex items-center justify-center">{item.icon}</span>
@@ -91,8 +90,8 @@ export default function AuthenticatedLayout({ children }) {
                         title={!isSidebarOpen ? "Sign Out" : ""}
                     >
                         <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                            <path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                            <path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                         {isSidebarOpen && <span>Sign Out</span>}
                     </button>
@@ -106,9 +105,9 @@ export default function AuthenticatedLayout({ children }) {
                 >
                     <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
                         {isSidebarOpen ? (
-                            <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         ) : (
-                            <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         )}
                     </svg>
                 </button>
@@ -127,8 +126,8 @@ export default function AuthenticatedLayout({ children }) {
                     <div className="bg-white p-10 rounded-3xl max-w-md w-11/12 shadow-2xl animate-slide-up text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="w-22 h-22 mx-auto mb-6 bg-gradient-to-br from-red-50 to-red-100 rounded-full flex items-center justify-center border-4 border-red-200">
                             <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="#DC2626" strokeWidth="2" strokeLinecap="round"/>
-                                <path d="M16 17l5-5-5-5M21 12H9" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" />
+                                <path d="M16 17l5-5-5-5M21 12H9" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </div>
                         <h2 className="text-2xl font-bold text-gray-900 mb-3 tracking-tight">Confirm Sign Out</h2>
