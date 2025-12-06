@@ -57,7 +57,6 @@ export default function Products() {
 
     const handleManageBatches = (product) => {
         const productId = product._id || product.id;
-        console.log('Managing batches for product:', productId);
         router.visit(`/admin/products/${productId}/batches`);
     };
 
@@ -145,11 +144,10 @@ export default function Products() {
                         ].map(filter => (
                             <button
                                 key={filter.value}
-                                className={`flex items-center gap-2 px-5 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${
-                                    filterStatus === filter.value
-                                        ? 'bg-gradient-to-br from-indigo-600 to-purple-700 text-white shadow-md shadow-indigo-500/30'
-                                        : 'bg-gray-50 text-gray-600 border-2 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
-                                }`}
+                                className={`flex items-center gap-2 px-5 py-3 rounded-xl font-medium text-sm transition-all duration-200 ${filterStatus === filter.value
+                                    ? 'bg-gradient-to-br from-indigo-600 to-purple-700 text-white shadow-md shadow-indigo-500/30'
+                                    : 'bg-gray-50 text-gray-600 border-2 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
+                                    }`}
                                 onClick={() => setFilterStatus(filter.value)}
                             >
                                 <span>{filter.icon}</span>
@@ -203,14 +201,22 @@ export default function Products() {
                                             </div>
                                         ))}
                                     </div>
-
                                     {/* Stock Info */}
                                     <div className="mt-4">
                                         <div className="flex flex-col gap-2">
                                             <div className="flex justify-between items-center text-xs">
                                                 <span className="text-gray-600">Stock Level</span>
-                                                <span className="text-gray-900 font-bold">{product.stock_quantity} {product.unit}</span>
+                                                <span className="text-gray-900 font-bold">
+                                                    {product.unit_quantity > 1
+                                                        ? `${Math.floor(product.stock_quantity / product.unit_quantity)} ${product.unit}`
+                                                        : `${product.stock_quantity} ${product.unit}`}
+                                                </span>
                                             </div>
+                                            {product.unit_quantity > 1 && (
+                                                <div className="text-xs text-gray-500">
+                                                    ({product.stock_quantity} total units, {product.unit_quantity} per {product.unit})
+                                                </div>
+                                            )}
                                             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                                                 <div
                                                     className="h-full rounded-full transition-all duration-300"
@@ -468,13 +474,27 @@ function ProductDetailsModal({ product, onClose, onManageBatches }) {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
                                 <span className="text-xs text-blue-700 font-medium uppercase tracking-wide block mb-1">Current Stock</span>
-                                <span className="text-2xl text-blue-900 font-bold">{product.stock_quantity || 0}</span>
-                                <span className="text-sm text-blue-700 font-medium ml-2">{getUnitDisplay(product.unit)}</span>
+                                <div>
+                                    <span className="text-2xl text-blue-900 font-bold">{product.stock_quantity || 0}</span>
+                                    <span className="text-sm text-blue-700 font-medium ml-2">pieces</span>
+                                </div>
+                                {product.unit_quantity > 1 && (
+                                    <div className="text-xs text-blue-700 mt-1">
+                                        ({Math.floor((product.stock_quantity || 0) / product.unit_quantity)} {getUnitDisplay(product.unit)})
+                                    </div>
+                                )}
                             </div>
                             <div className="p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl border border-yellow-200">
                                 <span className="text-xs text-yellow-700 font-medium uppercase tracking-wide block mb-1">Reorder Level</span>
-                                <span className="text-2xl text-yellow-900 font-bold">{product.reorder_level || 0}</span>
-                                <span className="text-sm text-yellow-700 font-medium ml-2">{getUnitDisplay(product.unit)}</span>
+                                <div>
+                                    <span className="text-2xl text-yellow-900 font-bold">{product.reorder_level || 0}</span>
+                                    <span className="text-sm text-yellow-700 font-medium ml-2">pieces</span>
+                                </div>
+                                {product.unit_quantity > 1 && (
+                                    <div className="text-xs text-yellow-700 mt-1">
+                                        ({Math.floor((product.reorder_level || 0) / product.unit_quantity)} {getUnitDisplay(product.unit)})
+                                    </div>
+                                )}
                             </div>
                             <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
                                 <span className="text-xs text-purple-700 font-medium uppercase tracking-wide block mb-1">Active Batches</span>

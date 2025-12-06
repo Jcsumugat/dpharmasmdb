@@ -53,7 +53,17 @@ Route::prefix('admin')->name('admin.')->group(function () {
             return Inertia::render('Admin/Products/Index');
         })->name('products');
 
-        // In your web.php, replace the batch management route with this:
+        Route::get('/products/{id}/edit', function ($id) {
+            $product = \App\Models\Product::findOrFail($id);
+            $categories = \App\Models\Category::all();
+            $suppliers = \App\Models\Supplier::all();
+
+            return Inertia::render('Admin/Products/Edit', [
+                'product' => $product,
+                'categories' => $categories,
+                'suppliers' => $suppliers,
+            ]);
+        })->name('products.edit');
 
         Route::get('/products/{id}/batches', function ($id) {
             $product = \App\Models\Product::findOrFail($id);
@@ -83,7 +93,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 'batches' => $batches
             ]);
         })->name('products.batches');
-        
+
         Route::get('/orders', function () {
             return Inertia::render('Admin/Orders/Index');
         })->name('orders');

@@ -326,16 +326,23 @@ class ProductController extends Controller
      */
     public function updateBatch(Request $request, $productId, $batchId)
     {
-        $product = Product::findOrFail($productId);
-
-        $validated = $request->validate([
-            'expiration_date' => 'sometimes|date',
-            'unit_cost' => 'sometimes|numeric|min:0',
-            'sale_price' => 'sometimes|numeric|min:0',
-            'notes' => 'nullable|string',
-        ]);
-
         try {
+            $product = Product::findOrFail($productId);
+
+            $validated = $request->validate([
+                'expiration_date' => 'sometimes|date',
+                'unit_cost' => 'sometimes|numeric|min:0',
+                'sale_price' => 'sometimes|numeric|min:0',
+                'notes' => 'nullable|string',
+            ]);
+
+            // Add logging to debug
+            Log::info('Updating batch', [
+                'product_id' => $productId,
+                'batch_id' => $batchId,
+                'data' => $validated
+            ]);
+
             $batch = $product->updateBatch($batchId, $validated);
 
             return response()->json([
@@ -344,6 +351,13 @@ class ProductController extends Controller
                 'batch' => $batch
             ]);
         } catch (\Exception $e) {
+            Log::error('Failed to update batch', [
+                'product_id' => $productId,
+                'batch_id' => $batchId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update batch: ' . $e->getMessage()

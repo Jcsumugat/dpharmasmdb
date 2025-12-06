@@ -6,6 +6,9 @@ import Modal from '@/Components/Modal';
 export default function BatchManagement({ product, batches, suppliers = [] }) {
     console.log('Component loaded with product:', product);
     console.log('Product unit_quantity:', product?.unit_quantity, 'Type:', typeof product?.unit_quantity);
+    console.log('Product ID fields:', { id: product?.id, _id: product?._id });
+    console.log('Sample batch:', batches?.available_batches?.[0]);
+
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [editingBatch, setEditingBatch] = useState(null);
@@ -46,6 +49,9 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
     };
 
     const openEditModal = (batch) => {
+        console.log('Opening edit modal for batch:', batch);
+        console.log('Batch ID fields:', { id: batch?.id, _id: batch?._id, $id: batch?.$id });
+
         setEditingBatch(batch);
         setData({
             expiration_date: batch.expiration_date?.split('T')[0] || '',
@@ -103,6 +109,7 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
             setData('quantity_received', '');
         }
     };
+
     const handleUnitQuantityChange = (value) => {
         setData('unit_quantity', value);
 
@@ -121,18 +128,15 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
     const handleAddBatch = async (e) => {
         e.preventDefault();
 
-        // Debug logs
         console.log('Form data:', data);
         console.log('Package quantity:', packageQuantity);
         console.log('Calculated quantity:', calculatedQuantity);
 
-        // Validate package quantity first
         if (!packageQuantity || packageQuantity === '' || isNaN(parseFloat(packageQuantity))) {
             alert('Please enter how many packages/units you received.');
             return;
         }
 
-        // Validate quantity_received
         if (!data.quantity_received || isNaN(parseFloat(data.quantity_received)) || parseFloat(data.quantity_received) <= 0) {
             alert('Calculated quantity is invalid. Please check your package quantity input.');
             return;
@@ -159,7 +163,13 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
 
             console.log('Submitting batch data:', submitData);
 
-            const response = await fetch(`/admin/api/products/${product.id}/add-batch`, {
+            // Use the correct product ID
+            const productId = product.id || product._id;
+            if (!productId) {
+                throw new Error('Product ID not found');
+            }
+
+            const response = await fetch(`/admin/api/products/${productId}/add-batch`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -188,13 +198,39 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
         }
     };
 
+    // UPDATE the handleUpdateBatch function (around line 159):
+
     const handleUpdateBatch = async (e) => {
         e.preventDefault();
         setLoading(true);
 
         try {
+            // FIX: Get the correct IDs from both product and batch
+            const productId = product.id || product._id;
+
+            // FIX: The batch.id is a MongoDB ObjectId object, need to convert to string
+            let batchId = null;
+            if (editingBatch.id) {
+                // If id is an object with $oid property (MongoDB ObjectId)
+                batchId = typeof editingBatch.id === 'object' && editingBatch.id.$oid
+                    ? editingBatch.id.$oid
+                    : String(editingBatch.id);
+            } else if (editingBatch._id) {
+                batchId = typeof editingBatch._id === 'object' && editingBatch._id.$oid
+                    ? editingBatch._id.$oid
+                    : String(editingBatch._id);
+            }
+
+            if (!productId) {
+                throw new Error('Product ID not found');
+            }
+
+            if (!batchId) {
+                throw new Error('Batch ID not found');
+            }
+
             const response = await fetch(
-                `/admin/api/products/${product.id}/batches/${editingBatch._id}`,
+                `/admin/api/products/${productId}/batches/${batchId}`,
                 {
                     method: 'PUT',
                     headers: {
@@ -217,10 +253,11 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
                 router.reload({ only: ['batches', 'product'] });
             } else {
                 alert(result.message || 'Failed to update batch');
+                console.error('Update failed:', result);
             }
         } catch (error) {
             console.error('Error updating batch:', error);
-            alert('Failed to update batch. Please try again.');
+            alert('Failed to update batch: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -252,6 +289,22 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
             return `${data.unit_quantity} ${data.unit}`;
         }
         return `${product?.unit_quantity || 'N/A'} ${product?.unit || ''}`;
+    };
+
+    // Helper function to get batch ID safely
+    const getBatchId = (batch) => {
+        if (batch.id) {
+            // If id is a MongoDB ObjectId object
+            return typeof batch.id === 'object' && batch.id.$oid
+                ? batch.id.$oid
+                : String(batch.id);
+        }
+        if (batch._id) {
+            return typeof batch._id === 'object' && batch._id.$oid
+                ? batch._id.$oid
+                : String(batch._id);
+        }
+        return null;
     };
 
     const availableBatches = batches?.available_batches || [];
@@ -345,7 +398,7 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {availableBatches.map((batch) => (
                                 <div
-                                    key={batch._id}
+                                    key={getBatchId(batch)}
                                     className={`bg-white rounded-xl p-6 border-2 transition-all hover:shadow-lg hover:-translate-y-1 ${getExpiryStatus(batch.expiration_date) === 'good'
                                         ? 'border-green-500'
                                         : getExpiryStatus(batch.expiration_date) === 'warning'
@@ -417,7 +470,7 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {expiredBatches.map((batch) => (
                                 <div
-                                    key={batch._id}
+                                    key={getBatchId(batch)}
                                     className="bg-red-50 rounded-xl p-6 border-2 border-red-900 opacity-70"
                                 >
                                     <div className="flex justify-between items-start mb-4 pb-4 border-b-2 border-red-100">
@@ -583,7 +636,7 @@ export default function BatchManagement({ product, batches, suppliers = [] }) {
                                 >
                                     <option value="">Use Product Default</option>
                                     {suppliers.map((supplier) => (
-                                        <option key={supplier.id} value={supplier.id}>
+                                        <option key={supplier.id || supplier._id} value={supplier.id || supplier._id}>
                                             {supplier.name}
                                         </option>
                                     ))}
