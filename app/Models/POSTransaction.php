@@ -4,7 +4,7 @@ namespace App\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
 
-class PosTransaction extends Model
+class POSTransaction extends Model
 {
     protected $connection = 'mongodb';
     protected $collection = 'pos_transactions';

@@ -202,7 +202,6 @@ class OrderController extends Controller
                     'payment_method' => $order->payment_method
                 ]
             ], 201);
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -222,6 +221,28 @@ class OrderController extends Controller
         }
     }
 
+    /**
+     * Get single order details
+     */
+    public function show($id)
+    {
+        try {
+            $order = Order::with(['customer', 'prescription'])
+                ->where('_id', $id)
+                ->firstOrFail();
+
+            return response()->json([
+                'success' => true,
+                'order' => $order
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found'
+            ], 404);
+        }
+    }
+    
     /**
      * Handle prescription file upload
      */
@@ -418,7 +439,7 @@ class OrderController extends Controller
         }
 
         $orders = $query->orderBy('created_at', 'desc')
-                       ->paginate(20);
+            ->paginate(20);
 
         return response()->json([
             'success' => true,

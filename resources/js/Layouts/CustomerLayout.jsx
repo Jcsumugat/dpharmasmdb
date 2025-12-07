@@ -28,7 +28,17 @@ export default function CustomerLayout({ children }) {
         // Poll for updates every 30 seconds
         const interval = setInterval(fetchUnreadCounts, 30000);
 
-        return () => clearInterval(interval);
+        // Listen for real-time updates from the notifications page
+        const handleNotificationUpdate = (event) => {
+            setUnreadNotifications(event.detail.count);
+        };
+
+        window.addEventListener('notification-count-updated', handleNotificationUpdate);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('notification-count-updated', handleNotificationUpdate);
+        };
     }, []);
 
     const fetchUnreadCounts = async () => {
@@ -157,7 +167,7 @@ export default function CustomerLayout({ children }) {
                                             <Icon className="w-5 h-5 flex-shrink-0" />
                                             <span className="flex-1">{item.name}</span>
                                             {hasBadge && (
-                                                <span className="px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
+                                                <span className="px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full min-w-[20px] text-center">
                                                     {item.badge > 99 ? '99+' : item.badge}
                                                 </span>
                                             )}
@@ -213,7 +223,6 @@ export default function CustomerLayout({ children }) {
                         </div>
                     </div>
                 </header>
-
 
                 {/* Logout Modal */}
                 {showLogoutModal && (

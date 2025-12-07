@@ -24,7 +24,7 @@ import {
 export default function NotificationsIndex() {
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('all'); // all, unread, read
+    const [filter, setFilter] = useState('all');
     const [selectedIds, setSelectedIds] = useState([]);
     const [actionLoading, setActionLoading] = useState(false);
     const [pagination, setPagination] = useState(null);
@@ -37,7 +37,6 @@ export default function NotificationsIndex() {
         setLoading(true);
         try {
             const params = new URLSearchParams();
-            // Fix: Backend expects 'status' parameter with values 'unread' or 'read'
             if (filter === 'unread') params.append('status', 'unread');
             if (filter === 'read') params.append('status', 'read');
 
@@ -45,11 +44,9 @@ export default function NotificationsIndex() {
             const data = await response.json();
 
             if (data.success) {
-                // Fix: Laravel pagination returns data in notifications.data
                 const notificationsList = data.notifications?.data || [];
                 setNotifications(Array.isArray(notificationsList) ? notificationsList : []);
 
-                // Store pagination info
                 setPagination({
                     current_page: data.notifications?.current_page,
                     last_page: data.notifications?.last_page,
@@ -67,22 +64,54 @@ export default function NotificationsIndex() {
         }
     };
 
-    const markAsRead = async (id) => {
+    // Function to update the badge count in the layout
+    const updateBadgeCount = async () => {
         try {
-            const response = await fetch(route('customer.api.notifications.mark-read', id), {
+            const response = await fetch(route('customer.api.notifications.unread-count'));
+            const data = await response.json();
+
+            if (data.success) {
+                // Dispatch a custom event that the layout can listen to
+                window.dispatchEvent(new CustomEvent('notification-count-updated', {
+                    detail: { count: data.count }
+                }));
+            }
+        } catch (error) {
+            console.error('Failed to update badge count:', error);
+        }
+    };
+
+    const markAsRead = async (notificationId) => {
+        if (!notificationId) {
+            console.error('No notification ID provided');
+            return;
+        }
+
+        try {
+            const url = `/customer/api/notifications/${notificationId}/mark-read`;
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
+                    'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                 }
             });
 
             const data = await response.json();
             if (data.success) {
+                // Update local state
                 setNotifications(prevNotifications =>
                     Array.isArray(prevNotifications)
-                        ? prevNotifications.map(n => n._id === id ? { ...n, is_read: true, read_at: new Date() } : n)
+                        ? prevNotifications.map(n => {
+                            const nId = n._id || n.id;
+                            return nId === notificationId ? { ...n, is_read: true, read_at: new Date() } : n;
+                        })
                         : []
                 );
+
+                // Update badge count
+                await updateBadgeCount();
             }
         } catch (error) {
             console.error('Failed to mark as read:', error);
@@ -102,6 +131,8 @@ export default function NotificationsIndex() {
             const data = await response.json();
             if (data.success) {
                 loadNotifications();
+                // Update badge count
+                await updateBadgeCount();
             }
         } catch (error) {
             console.error('Failed to mark all as read:', error);
@@ -110,13 +141,21 @@ export default function NotificationsIndex() {
         }
     };
 
-    const deleteNotification = async (id) => {
+    const deleteNotification = async (notificationId) => {
+        if (!notificationId) {
+            console.error('No notification ID provided');
+            return;
+        }
+
         if (!confirm('Are you sure you want to delete this notification?')) return;
 
         try {
-            const response = await fetch(route('customer.api.notifications.destroy', id), {
+            const url = `/customer/api/notifications/${notificationId}`;
+
+            const response = await fetch(url, {
                 method: 'DELETE',
                 headers: {
+                    'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                 }
             });
@@ -125,9 +164,15 @@ export default function NotificationsIndex() {
             if (data.success) {
                 setNotifications(prevNotifications =>
                     Array.isArray(prevNotifications)
-                        ? prevNotifications.filter(n => n._id !== id)
+                        ? prevNotifications.filter(n => {
+                            const nId = n._id || n.id;
+                            return nId !== notificationId;
+                        })
                         : []
                 );
+
+                // Update badge count
+                await updateBadgeCount();
             }
         } catch (error) {
             console.error('Failed to delete notification:', error);
@@ -135,9 +180,11 @@ export default function NotificationsIndex() {
     };
 
     const handleNotificationClick = (notification) => {
+        const notificationId = notification._id || notification.id;
+
         // Mark as read
-        if (!notification.is_read) {
-            markAsRead(notification._id);
+        if (!notification.is_read && notificationId) {
+            markAsRead(notificationId);
         }
 
         // Navigate to action URL if exists
@@ -229,7 +276,6 @@ export default function NotificationsIndex() {
         });
     };
 
-    // Safe calculation of unread count with array check (use is_read instead of read)
     const unreadCount = Array.isArray(notifications)
         ? notifications.filter(n => !n.is_read).length
         : 0;
@@ -264,31 +310,28 @@ export default function NotificationsIndex() {
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => setFilter('all')}
-                                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                                        filter === 'all'
+                                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'all'
                                             ? 'bg-blue-600 text-white'
                                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
+                                        }`}
                                 >
                                     All
                                 </button>
                                 <button
                                     onClick={() => setFilter('unread')}
-                                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                                        filter === 'unread'
+                                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'unread'
                                             ? 'bg-blue-600 text-white'
                                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
+                                        }`}
                                 >
                                     Unread
                                 </button>
                                 <button
                                     onClick={() => setFilter('read')}
-                                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                                        filter === 'read'
+                                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'read'
                                             ? 'bg-blue-600 text-white'
                                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
+                                        }`}
                                 >
                                     Read
                                 </button>
@@ -340,15 +383,15 @@ export default function NotificationsIndex() {
                             notifications.map((notification) => {
                                 const Icon = getNotificationIcon(notification.type);
                                 const iconColor = getNotificationColor(notification.type);
+                                const notificationId = notification._id || notification.id;
 
                                 return (
                                     <div
-                                        key={notification._id}
-                                        className={`bg-white rounded-xl border transition-all cursor-pointer ${
-                                            notification.is_read
+                                        key={notificationId}
+                                        className={`bg-white rounded-xl border transition-all cursor-pointer ${notification.is_read
                                                 ? 'border-gray-200 hover:shadow-sm'
                                                 : 'border-blue-200 bg-blue-50/50 hover:shadow-md'
-                                        }`}
+                                            }`}
                                         onClick={() => handleNotificationClick(notification)}
                                     >
                                         <div className="p-4">
@@ -361,9 +404,8 @@ export default function NotificationsIndex() {
                                                 {/* Content */}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-start justify-between gap-2 mb-1">
-                                                        <h3 className={`font-semibold ${
-                                                            notification.is_read ? 'text-gray-900' : 'text-blue-900'
-                                                        }`}>
+                                                        <h3 className={`font-semibold ${notification.is_read ? 'text-gray-900' : 'text-blue-900'
+                                                            }`}>
                                                             {notification.title}
                                                         </h3>
                                                         <div className="flex items-center gap-2">
@@ -401,7 +443,7 @@ export default function NotificationsIndex() {
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                markAsRead(notification._id);
+                                                                markAsRead(notificationId);
                                                             }}
                                                             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                                             title="Mark as read"
@@ -412,7 +454,7 @@ export default function NotificationsIndex() {
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            deleteNotification(notification._id);
+                                                            deleteNotification(notificationId);
                                                         }}
                                                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                                         title="Delete"

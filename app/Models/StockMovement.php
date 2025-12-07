@@ -19,11 +19,15 @@ class StockMovement extends Model
         'notes',
         'performed_by',
         'timestamp',
+        'created_at',
+        'updated_at',
     ];
 
     protected $casts = [
         'quantity' => 'integer',
         'timestamp' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     // Movement types
@@ -34,6 +38,21 @@ class StockMovement extends Model
     const TYPE_ADJUSTMENT = 'adjustment';
     const TYPE_EXPIRED = 'expired';
     const TYPE_MANUAL = 'manual';
+
+    // Boot method to sync timestamp with created_at
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (!$model->timestamp) {
+                $model->timestamp = now();
+            }
+            if (!$model->created_at) {
+                $model->created_at = $model->timestamp ?? now();
+            }
+        });
+    }
 
     // Relationships
     public function product()
@@ -49,6 +68,8 @@ class StockMovement extends Model
     // Static factory methods
     public static function recordMovement($productId, $type, $quantity, $referenceType = null, $referenceId = null, $notes = null, $batchId = null, $performedBy = null)
     {
+        $timestamp = now();
+
         return self::create([
             'product_id' => $productId,
             'batch_id' => $batchId,
@@ -58,7 +79,8 @@ class StockMovement extends Model
             'reference_id' => $referenceId,
             'notes' => $notes,
             'performed_by' => $performedBy ?? auth()->id(),
-            'timestamp' => now(),
+            'timestamp' => $timestamp,
+            'created_at' => $timestamp,
         ]);
     }
 
@@ -85,6 +107,12 @@ class StockMovement extends Model
 
     public function scopeRecent($query, $days = 30)
     {
-        return $query->where('timestamp', '>=', now()->subDays($days));
+        return $query->where('created_at', '>=', now()->subDays($days));
+    }
+
+    // Helper method to get the effective date (tries created_at first, falls back to timestamp)
+    public function getEffectiveDateAttribute()
+    {
+        return $this->created_at ?? $this->timestamp;
     }
 }

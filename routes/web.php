@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\SupplierController;
+use App\Http\Controllers\Api\ReportController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -93,6 +94,26 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ]);
         })->name('products.batches');
 
+        // Orders page
+        Route::get('/orders', function () {
+            return Inertia::render('Admin/Orders/Index');
+        })->name('orders');
+
+        Route::get('/orders/{id}', function ($id) {
+            try {
+                $order = \App\Models\Order::with(['customer', 'prescription'])
+                    ->where('_id', $id)
+                    ->firstOrFail();
+
+                return Inertia::render('Admin/Orders/Detail', [
+                    'order' => $order
+                ]);
+            } catch (\Exception $e) {
+                return redirect()->route('admin.orders')
+                    ->with('error', 'Order not found');
+            }
+        })->name('orders.detail');
+
         // Prescriptions page (now handles orders too)
         Route::get('/prescriptions', function () {
             return Inertia::render('Admin/Prescriptions/Index');
@@ -151,6 +172,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/products/{id}/batches', [ProductController::class, 'getBatches'])->name('products.batches.api');
             Route::get('/products/{id}/stock-movements', [ProductController::class, 'getStockMovements'])->name('products.stock-movements');
 
+            // Orders API
+            Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+            Route::get('/orders/{id}', [OrderController::class, 'show'])->name('orders.show');
+
             // Prescriptions (now includes order management)
             Route::get('/prescriptions', [PrescriptionController::class, 'index'])->name('prescriptions.index');
             Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show'])->name('prescriptions.show');
@@ -196,6 +221,17 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
             Route::post('/notifications/delete-multiple', [NotificationController::class, 'destroyMultiple'])->name('notifications.delete-multiple');
             Route::delete('/notifications/delete-all-read', [NotificationController::class, 'deleteAllRead'])->name('notifications.delete-all-read');
+        });
+
+        // Reports
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/dashboard', [ReportController::class, 'dashboard'])->name('dashboard');
+            Route::get('/sales', [ReportController::class, 'sales'])->name('sales');
+            Route::get('/inventory', [ReportController::class, 'inventory'])->name('inventory');
+            Route::get('/top-products', [ReportController::class, 'topProducts'])->name('top-products');
+            Route::get('/expiring-products', [ReportController::class, 'expiringProducts'])->name('expiring-products');
+            Route::get('/customers', [ReportController::class, 'customers'])->name('customers');
+            Route::get('/prescriptions', [ReportController::class, 'prescriptions'])->name('prescriptions');
         });
     });
 });
