@@ -180,6 +180,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/conversations', [ConversationController::class, 'index'])->name('conversations.index');
             Route::get('/conversations/{id}', [ConversationController::class, 'show'])->name('conversations.show');
             Route::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'])->name('conversations.send-message');
+            Route::post('/conversations/{id}/mark-read', [ConversationController::class, 'markAsRead'])->name('conversations.mark-read');
+            Route::post('/conversations/{id}/status', [ConversationController::class, 'updateStatus'])->name('conversations.update-status');
             Route::post('/conversations/{id}/close', [ConversationController::class, 'close'])->name('conversations.close');
 
             // Notifications
@@ -204,16 +206,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
 Route::prefix('customer')->name('customer.')->group(function () {
 
-    // Guest routes
-    Route::middleware('guest')->group(function () {
-        Route::get('/signup/step-1', [CustomerAuthController::class, 'showRegistrationStep1'])->name('signup.step_one');
-        Route::post('/signup/step-1', [CustomerAuthController::class, 'handleRegistrationStep1'])->name('signup.step_one.post');
-        Route::get('/signup/step-2', [CustomerAuthController::class, 'showRegistrationStep2'])->name('signup.step_two');
-        Route::post('/signup/step-2', [CustomerAuthController::class, 'handleRegistrationStep2'])->name('signup.step_two.post');
+    Route::get('/signup/step-1', [CustomerAuthController::class, 'showRegistrationStep1'])->name('signup.step_one');
+    Route::post('/signup/step-1', [CustomerAuthController::class, 'handleRegistrationStep1'])->name('signup.step_one.post');
+    Route::get('/signup/step-2', [CustomerAuthController::class, 'showRegistrationStep2'])->name('signup.step_two');
+    Route::post('/signup/step-2', [CustomerAuthController::class, 'handleRegistrationStep2'])->name('signup.step_two.post');
 
-        Route::get('/login', [CustomerAuthController::class, 'showLoginForm'])->name('login');
-        Route::post('/login', [CustomerAuthController::class, 'login'])->name('login.post');
-    });
+    Route::get('/login', [CustomerAuthController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [CustomerAuthController::class, 'login'])->name('login.post');
 
     // Authenticated routes
     Route::middleware('auth')->group(function () {
@@ -280,6 +279,10 @@ Route::prefix('customer')->name('customer.')->group(function () {
             return Inertia::render('Customer/Conversations/Index');
         })->name('conversations');
 
+        Route::get('/conversations/{id}', function ($id) {
+            return Inertia::render('Customer/Conversations/Detail');
+        })->name('conversations.detail');
+
 
         // Notifications page
         Route::get('/notifications', function () {
@@ -311,6 +314,7 @@ Route::prefix('customer')->name('customer.')->group(function () {
             Route::post('/conversations', [ConversationController::class, 'store'])->name('conversations.store');
             Route::get('/conversations/{id}', [ConversationController::class, 'show'])->name('conversations.show');
             Route::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'])->name('conversations.send-message');
+            Route::post('/conversations/{id}/mark-read', [ConversationController::class, 'markAsRead'])->name('conversations.mark-read');
 
             // Notifications
             Route::get('/notifications', [NotificationController::class, 'customerNotifications'])->name('notifications.index');

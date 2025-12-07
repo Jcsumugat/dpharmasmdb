@@ -34,8 +34,8 @@ class ConversationController extends Controller
         }
 
         $conversations = $query->with(['customer', 'admin'])
-                              ->orderBy('last_message_at', 'desc')
-                              ->paginate(20);
+            ->orderBy('last_message_at', 'desc')
+            ->paginate(20);
 
         return response()->json([
             'success' => true,
@@ -48,123 +48,171 @@ class ConversationController extends Controller
      */
     public function customerConversations()
     {
-        $customer = Auth::guard('customer')->user();
+        // Use the default auth (should work for customers)
+        $customer = Auth::user();
 
         if (!$customer) {
-            return response()->json(['error' => 'Unauthorized'], 401);
+            return response()->json([
+                'success' => false,
+                'error' => 'Unauthorized'
+            ], 401);
         }
 
-        $conversations = Conversation::where('customer_id', $customer->_id)
-                                    ->with('admin')
-                                    ->orderBy('last_message_at', 'desc')
-                                    ->get();
+        try {
+            $conversations = Conversation::where('customer_id', (string)$customer->_id)
+                ->with('admin')
+                ->orderBy('last_message_at', 'desc')
+                ->get();
 
-        return response()->json([
-            'success' => true,
-            'conversations' => $conversations
-        ]);
+            return response()->json([
+                'success' => true,
+                'conversations' => $conversations
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to load conversations',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
-     * Find or create conversation
+     * Create new conversation
      */
-    public function findOrCreate(Request $request)
+    public function store(Request $request)
     {
+        $customer = Auth::user();
+
+        if (!$customer) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Unauthorized'
+            ], 401);
+        }
+
         $validated = $request->validate([
-            'customer_id' => 'required|string',
             'type' => 'required|string|in:prescription_inquiry,order_concern,general_support,complaint,product_inquiry',
             'title' => 'nullable|string',
         ]);
 
-        // Check for existing active conversation
-        $conversation = Conversation::where('customer_id', $validated['customer_id'])
-                                   ->whereIn('status', ['active', 'pending'])
-                                   ->first();
-
-        if (!$conversation) {
-            $customer = User::findOrFail($validated['customer_id']);
-
+        try {
             $conversation = Conversation::create([
-                'customer_id' => $validated['customer_id'],
-                'admin_id' => auth()->id(), // Current admin
-                'title' => $validated['title'] ?? "Chat with {$customer->name}",
+                'customer_id' => (string)$customer->_id,
+                'admin_id' => null, // Will be assigned by admin
+                'title' => $validated['title'] ?? $this->getDefaultTitle($validated['type']),
                 'type' => $validated['type'],
-                'status' => 'active',
+                'status' => 'pending', // Start as pending until admin responds
                 'priority' => 'normal',
                 'messages' => [],
                 'last_message_at' => now(),
             ]);
-        }
 
-        return response()->json([
-            'success' => true,
-            'conversation' => $conversation->load(['customer', 'admin'])
-        ]);
+            return response()->json([
+                'success' => true,
+                'conversation' => $conversation
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to create conversation',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
-     * Get conversation messages
+     * Get conversation details
      */
-    public function getMessages($conversationId)
+    public function show($id)
     {
-        $conversation = Conversation::findOrFail($conversationId);
-
-        // Authorize access
-        $user = Auth::user() ?? Auth::guard('customer')->user();
+        $user = Auth::user();
 
         if (!$user) {
-            return response()->json(['error' => 'Unauthorized'], 401);
+            return response()->json([
+                'success' => false,
+                'error' => 'Unauthorized'
+            ], 401);
         }
 
-        // Customer can only view their own conversations
-        if ($user instanceof \App\Models\Customer && $user->_id != $conversation->customer_id) {
-            return response()->json(['error' => 'Forbidden'], 403);
-        }
+        try {
+            $conversation = Conversation::findOrFail($id);
 
-        $messages = collect($conversation->messages)->filter(function($message) use ($user) {
-            // Filter out internal notes for customers
-            if ($user instanceof \App\Models\Customer) {
-                return !($message['is_internal_note'] ?? false);
+            // Check if user has access to this conversation
+            if ($user->role === 'customer' && (string)$conversation->customer_id !== (string)$user->_id) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Forbidden'
+                ], 403);
             }
-            return true;
-        })->values();
 
-        return response()->json([
-            'success' => true,
-            'messages' => $messages,
-            'conversation' => $conversation
-        ]);
+            // Load relationships
+            $conversation->load(['customer', 'admin']);
+
+            // Filter out internal notes for customers
+            if ($user->role === 'customer') {
+                $messages = collect($conversation->messages)->filter(function ($message) {
+                    return !($message['is_internal_note'] ?? false);
+                })->values()->all();
+
+                $conversation->messages = $messages;
+            }
+
+            return response()->json([
+                'success' => true,
+                'conversation' => $conversation
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to load conversation',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
      * Send message
      */
-    public function sendMessage(Request $request, $conversationId)
+    public function sendMessage(Request $request, $id)
     {
-        $conversation = Conversation::findOrFail($conversationId);
-
-        $validated = $request->validate([
-            'message' => 'required_without:attachments|string',
-            'message_type' => 'nullable|string|in:text,file,image,system',
-            'is_internal_note' => 'nullable|boolean',
-            'attachments' => 'nullable|array',
-            'attachments.*' => 'file|max:10240',
-        ]);
-
-        $user = Auth::user() ?? Auth::guard('customer')->user();
+        $user = Auth::user();
 
         if (!$user) {
-            return response()->json(['error' => 'Unauthorized'], 401);
+            return response()->json([
+                'success' => false,
+                'error' => 'Unauthorized'
+            ], 401);
         }
 
-        $isCustomer = $user instanceof \App\Models\Customer;
-
-        // Customers cannot send internal notes
-        if ($isCustomer && ($validated['is_internal_note'] ?? false)) {
-            return response()->json(['error' => 'Forbidden'], 403);
-        }
+        $validated = $request->validate([
+            'message' => 'required_without:attachments|string|max:5000',
+            'message_type' => 'nullable|string|in:text,file,image,system',
+            'is_internal_note' => 'nullable',
+            'attachments' => 'nullable|array',
+            'attachments.*' => 'file|max:10240', // 10MB max
+        ]);
 
         try {
+            $conversation = Conversation::findOrFail($id);
+
+            // Check access
+            if ($user->role === 'customer' && (string)$conversation->customer_id !== (string)$user->_id) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Forbidden'
+                ], 403);
+            }
+
+            // Customers cannot send internal notes
+            if ($user->role === 'customer' && ($validated['is_internal_note'] ?? false)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Forbidden'
+                ], 403);
+            }
+
             $attachments = [];
 
             // Handle file attachments
@@ -183,15 +231,21 @@ class ConversationController extends Controller
             }
 
             $messageData = [
-                'sender_type' => $isCustomer ? 'customer' : 'admin',
-                'sender_id' => $user->_id,
+                'sender_type' => $user->role === 'customer' ? 'customer' : 'admin',
+                'sender_id' => (string)$user->_id,
                 'message' => $validated['message'] ?? '',
                 'message_type' => $validated['message_type'] ?? ($attachments ? 'file' : 'text'),
                 'attachments' => $attachments,
-                'is_internal_note' => $validated['is_internal_note'] ?? false,
+                'is_internal_note' => filter_var($request->input('is_internal_note', false), FILTER_VALIDATE_BOOLEAN),
             ];
 
             $message = $conversation->addMessage($messageData);
+
+            // Update conversation status to active if it was pending
+            if ($conversation->status === 'pending' && $user->role !== 'customer') {
+                $conversation->status = 'active';
+                $conversation->save();
+            }
 
             return response()->json([
                 'success' => true,
@@ -201,7 +255,8 @@ class ConversationController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to send message: ' . $e->getMessage()
+                'error' => 'Failed to send message',
+                'message' => $e->getMessage()
             ], 500);
         }
     }
@@ -209,51 +264,86 @@ class ConversationController extends Controller
     /**
      * Mark conversation as read
      */
-    public function markAsRead($conversationId)
+    public function markAsRead($id)
     {
-        $conversation = Conversation::findOrFail($conversationId);
-        $user = Auth::user() ?? Auth::guard('customer')->user();
+        $user = Auth::user();
 
         if (!$user) {
-            return response()->json(['error' => 'Unauthorized'], 401);
+            return response()->json([
+                'success' => false,
+                'error' => 'Unauthorized'
+            ], 401);
         }
 
-        $isCustomer = $user instanceof \App\Models\Customer;
-        $userType = $isCustomer ? 'customer' : 'admin';
+        try {
+            $conversation = Conversation::findOrFail($id);
 
-        $conversation->markMessagesAsRead($user->_id, $userType);
+            // Check access
+            if ($user->role === 'customer' && (string)$conversation->customer_id !== (string)$user->_id) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Forbidden'
+                ], 403);
+            }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Marked as read'
-        ]);
+            $userType = $user->role === 'customer' ? 'customer' : 'admin';
+            $conversation->markMessagesAsRead((string)$user->_id, $userType);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Marked as read'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to mark as read',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
      * Update conversation status
      */
-    public function updateStatus(Request $request, $conversationId)
+    public function updateStatus(Request $request, $id)
     {
-        $conversation = Conversation::findOrFail($conversationId);
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Unauthorized'
+            ], 401);
+        }
 
         $validated = $request->validate([
             'status' => 'required|string|in:active,resolved,closed,pending',
         ]);
 
-        $conversation->update(['status' => $validated['status']]);
+        try {
+            $conversation = Conversation::findOrFail($id);
 
-        // Add system message
-        $conversation->addMessage([
-            'sender_type' => 'system',
-            'sender_id' => null,
-            'message' => "Conversation marked as {$validated['status']}",
-            'message_type' => 'system',
-        ]);
+            $conversation->update(['status' => $validated['status']]);
 
-        return response()->json([
-            'success' => true,
-            'conversation' => $conversation->fresh()
-        ]);
+            // Add system message
+            $conversation->addMessage([
+                'sender_type' => 'system',
+                'sender_id' => null,
+                'message' => "Conversation marked as {$validated['status']}",
+                'message_type' => 'system',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'conversation' => $conversation->fresh()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to update status',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -261,32 +351,57 @@ class ConversationController extends Controller
      */
     public function getUnreadCount()
     {
-        $user = Auth::user() ?? Auth::guard('customer')->user();
+        $user = Auth::user();
 
         if (!$user) {
-            return response()->json(['error' => 'Unauthorized'], 401);
+            return response()->json([
+                'success' => false,
+                'error' => 'Unauthorized'
+            ], 401);
         }
 
-        $isCustomer = $user instanceof \App\Models\Customer;
-        $userType = $isCustomer ? 'customer' : 'admin';
+        try {
+            $userType = $user->role === 'customer' ? 'customer' : 'admin';
+            $query = Conversation::query();
 
-        $query = Conversation::query();
+            if ($user->role === 'customer') {
+                $query->where('customer_id', (string)$user->_id);
+            } else {
+                $query->where('admin_id', (string)$user->_id);
+            }
 
-        if ($isCustomer) {
-            $query->where('customer_id', $user->_id);
-        } else {
-            $query->where('admin_id', $user->_id);
+            $conversations = $query->get();
+
+            $unreadCount = $conversations->sum(function ($conversation) use ($user, $userType) {
+                return $conversation->getUnreadCount((string)$user->_id, $userType);
+            });
+
+            return response()->json([
+                'success' => true,
+                'unread_count' => $unreadCount
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to get unread count',
+                'message' => $e->getMessage()
+            ], 500);
         }
+    }
 
-        $conversations = $query->get();
+    /**
+     * Get default title for conversation type
+     */
+    private function getDefaultTitle($type)
+    {
+        $titles = [
+            'prescription_inquiry' => 'Prescription Inquiry',
+            'order_concern' => 'Order Concern',
+            'general_support' => 'General Support',
+            'complaint' => 'Complaint',
+            'product_inquiry' => 'Product Inquiry'
+        ];
 
-        $unreadCount = $conversations->sum(function($conversation) use ($user, $userType) {
-            return $conversation->getUnreadCount($user->_id, $userType);
-        });
-
-        return response()->json([
-            'success' => true,
-            'unread_count' => $unreadCount
-        ]);
+        return $titles[$type] ?? 'New Conversation';
     }
 }

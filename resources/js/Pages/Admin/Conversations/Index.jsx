@@ -33,7 +33,7 @@ export default function ConversationsIndex() {
 
     useEffect(() => {
         if (selectedConversation) {
-            fetchMessages(selectedConversation._id);
+            fetchMessages(selectedConversation.id || selectedConversation._id);
         }
     }, [selectedConversation]);
 
@@ -76,11 +76,11 @@ export default function ConversationsIndex() {
     const fetchMessages = async (conversationId) => {
         setMessagesLoading(true);
         try {
-            const response = await fetch(`/admin/api/conversations/${conversationId}/messages`);
+            const response = await fetch(`/admin/api/conversations/${conversationId}`);
             const data = await response.json();
 
             if (data.success) {
-                setMessages(data.messages || []);
+                setMessages(data.conversation.messages || []);
                 await markAsRead(conversationId);
             }
         } catch (error) {
@@ -92,7 +92,7 @@ export default function ConversationsIndex() {
 
     const markAsRead = async (conversationId) => {
         try {
-            await fetch(`/admin/api/conversations/${conversationId}/read`, {
+            await fetch(`/admin/api/conversations/${conversationId}/mark-read`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -117,13 +117,16 @@ export default function ConversationsIndex() {
         try {
             const formData = new FormData();
             formData.append('message', messageInput);
-            formData.append('is_internal_note', isInternalNote);
+            formData.append('is_internal_note', isInternalNote ? 'true' : 'false');
 
-            attachments.forEach((file) => {
-                formData.append('attachments[]', file);
+            attachments.forEach((file, index) => {
+                formData.append(`attachments[${index}]`, file);
             });
 
-            const response = await fetch(`/admin/api/conversations/${selectedConversation._id}/messages`, {
+            const conversationId = selectedConversation.id || selectedConversation._id;
+            console.log('Sending message to:', `/admin/api/conversations/${conversationId}/messages`);
+
+            const response = await fetch(`/admin/api/conversations/${conversationId}/messages`, {
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
@@ -131,20 +134,32 @@ export default function ConversationsIndex() {
                 body: formData
             });
 
+            console.log('Response status:', response.status);
+
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error('Non-JSON response:', text.substring(0, 500));
+                alert('Server error. Check console for details.');
+                return;
+            }
+
             const data = await response.json();
+            console.log('Response data:', data);
 
             if (data.success) {
                 setMessageInput('');
                 setAttachments([]);
                 setIsInternalNote(false);
-                fetchMessages(selectedConversation._id);
+                fetchMessages(conversationId);
                 fetchConversations();
             } else {
-                alert(data.message || 'Failed to send message');
+                alert(data.message || data.error || 'Failed to send message');
             }
         } catch (error) {
             console.error('Error sending message:', error);
-            alert('Failed to send message');
+            alert('Failed to send message: ' + error.message);
         } finally {
             setSendingMessage(false);
         }
@@ -170,8 +185,9 @@ export default function ConversationsIndex() {
         if (!selectedConversation || !newStatus) return;
 
         try {
-            const response = await fetch(`/admin/api/conversations/${selectedConversation._id}/status`, {
-                method: 'PUT',
+            const conversationId = selectedConversation.id || selectedConversation._id;
+            const response = await fetch(`/admin/api/conversations/${conversationId}/status`, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
@@ -183,7 +199,7 @@ export default function ConversationsIndex() {
 
             if (data.success) {
                 setShowStatusModal(false);
-                fetchMessages(selectedConversation._id);
+                fetchMessages(conversationId);
                 fetchConversations();
                 alert('Status updated successfully');
             } else {
@@ -228,6 +244,7 @@ export default function ConversationsIndex() {
     };
 
     const formatDate = (dateString) => {
+        if (!dateString) return '';
         const date = new Date(dateString);
         const now = new Date();
         const diff = now - date;
@@ -244,6 +261,7 @@ export default function ConversationsIndex() {
     };
 
     const formatMessageTime = (dateString) => {
+        if (!dateString) return '';
         return new Date(dateString).toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit'
@@ -303,20 +321,21 @@ export default function ConversationsIndex() {
                         ) : (
                             conversations.map((conversation) => (
                                 <div
-                                    key={conversation._id}
+                                    key={conversation.id || conversation._id}
                                     onClick={() => handleSelectConversation(conversation)}
-                                    className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors ${
-                                        selectedConversation?._id === conversation._id ? 'bg-indigo-50' : ''
-                                    }`}
+                                    className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors ${(selectedConversation?.id || selectedConversation?._id) === (conversation.id || conversation._id) ? 'bg-indigo-50' : ''
+                                        }`}
                                 >
                                     <div className="flex items-start space-x-3">
                                         <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-semibold flex-shrink-0">
-                                            {conversation.customer?.name?.charAt(0).toUpperCase()}
+                                            {conversation.customer?.first_name?.charAt(0).toUpperCase() || conversation.customer?.name?.charAt(0).toUpperCase() || 'U'}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between mb-1">
                                                 <p className="text-sm font-semibold text-gray-900 truncate">
-                                                    {conversation.customer?.name || 'Unknown'}
+                                                    {conversation.customer?.first_name && conversation.customer?.last_name
+                                                        ? `${conversation.customer.first_name} ${conversation.customer.last_name}`
+                                                        : conversation.customer?.name || 'Unknown'}
                                                 </p>
                                                 <span className="text-xs text-gray-500">
                                                     {formatDate(conversation.last_message_at)}
@@ -367,11 +386,13 @@ export default function ConversationsIndex() {
                             <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
                                     <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-semibold">
-                                        {selectedConversation.customer?.name?.charAt(0).toUpperCase()}
+                                        {selectedConversation.customer?.first_name?.charAt(0).toUpperCase() || selectedConversation.customer?.name?.charAt(0).toUpperCase() || 'U'}
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-gray-900">
-                                            {selectedConversation.customer?.name || 'Unknown'}
+                                            {selectedConversation.customer?.first_name && selectedConversation.customer?.last_name
+                                                ? `${selectedConversation.customer.first_name} ${selectedConversation.customer.last_name}`
+                                                : selectedConversation.customer?.name || 'Unknown'}
                                         </h3>
                                         <p className="text-xs text-gray-600">{selectedConversation.customer?.email}</p>
                                     </div>
@@ -403,19 +424,27 @@ export default function ConversationsIndex() {
                                             const isSystem = message.sender_type === 'system';
                                             const isInternal = message.is_internal_note;
 
-                                            if (isSystem) {
-                                                return (
-                                                    <div key={index} className="flex justify-center">
-                                                        <div className="bg-gray-200 px-4 py-2 rounded-full text-xs text-gray-600">
-                                                            {message.message}
-                                                        </div>
-                                                    </div>
-                                                );
+                                            // Generate a unique key - handle both string and ObjectId
+                                            let messageKey;
+                                            if (message._id) {
+                                                if (typeof message._id === 'string') {
+                                                    messageKey = message._id;
+                                                } else if (message._id.$oid) {
+                                                    messageKey = message._id.$oid;
+                                                } else if (message._id.toString && message._id.toString() !== '[object Object]') {
+                                                    messageKey = message._id.toString();
+                                                } else {
+                                                    messageKey = `msg-${index}-${message.timestamp || Date.now()}`;
+                                                }
+                                            } else if (message.id) {
+                                                messageKey = String(message.id);
+                                            } else {
+                                                messageKey = `msg-${index}-${message.timestamp || Date.now()}`;
                                             }
 
                                             return (
                                                 <div
-                                                    key={index}
+                                                    key={messageKey}
                                                     className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}
                                                 >
                                                     <div className={`max-w-[70%]`}>
@@ -425,13 +454,12 @@ export default function ConversationsIndex() {
                                                             </div>
                                                         )}
                                                         <div
-                                                            className={`rounded-2xl px-4 py-2 ${
-                                                                isInternal
-                                                                    ? 'bg-yellow-100 border-2 border-yellow-300'
-                                                                    : isAdmin
+                                                            className={`rounded-2xl px-4 py-2 ${isInternal
+                                                                ? 'bg-yellow-100 border-2 border-yellow-300'
+                                                                : isAdmin
                                                                     ? 'bg-indigo-600 text-white'
                                                                     : 'bg-white border border-gray-200'
-                                                            }`}
+                                                                }`}
                                                         >
                                                             <p className={`text-sm ${isAdmin && !isInternal ? 'text-white' : 'text-gray-900'}`}>
                                                                 {message.message}
@@ -444,9 +472,8 @@ export default function ConversationsIndex() {
                                                                             href={`/storage/${attachment.file_path}`}
                                                                             target="_blank"
                                                                             rel="noopener noreferrer"
-                                                                            className={`block text-xs underline ${
-                                                                                isAdmin && !isInternal ? 'text-white' : 'text-indigo-600'
-                                                                            }`}
+                                                                            className={`block text-xs underline ${isAdmin && !isInternal ? 'text-white' : 'text-indigo-600'
+                                                                                }`}
                                                                         >
                                                                             📎 {attachment.file_name}
                                                                         </a>

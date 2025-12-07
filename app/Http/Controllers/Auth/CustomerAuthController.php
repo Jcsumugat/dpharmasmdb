@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Password;
+use Inertia\Inertia;
 
 class CustomerAuthController extends Controller
 {
@@ -125,11 +126,14 @@ class CustomerAuthController extends Controller
         }
     }
 
-    /**
-     * Show customer login form
-     */
     public function showLoginForm()
     {
+        // If logged in as customer, redirect to home
+        if (Auth::check() && Auth::user()->role === 'customer') {
+            return redirect()->route('customer.home');
+        }
+
+        // Allow access if not logged in OR logged in as admin
         return view('client.login');
     }
 
@@ -138,6 +142,18 @@ class CustomerAuthController extends Controller
      */
     public function login(Request $request)
     {
+        // If already logged in as customer, redirect
+        if (Auth::check() && Auth::user()->role === 'customer') {
+            return redirect()->route('customer.home');
+        }
+
+        // If logged in as admin, logout first
+        if (Auth::check() && in_array(Auth::user()->role, ['admin', 'staff'])) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
+
         $credentials = $request->validate([
             'mobile' => 'required|string',
             'password' => 'required|string',
@@ -361,7 +377,7 @@ class CustomerAuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('customer.login')
-            ->with('success', 'You have been logged out successfully.');
+        // Force a full page reload to break out of Inertia context
+        return Inertia::location(route('customer.login'));
     }
 }

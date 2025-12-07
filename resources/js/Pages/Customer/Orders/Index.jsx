@@ -13,7 +13,11 @@ import {
     Calendar,
     DollarSign,
     MapPin,
-    FileText
+    FileText,
+    ArrowLeft,
+    Phone,
+    User,
+    AlertCircle
 } from 'lucide-react';
 
 export default function OrdersIndex() {
@@ -47,17 +51,24 @@ export default function OrdersIndex() {
             const data = await response.json();
 
             if (data.success) {
-                setOrders(data.orders.data || []);
-                calculateStats(data.orders.data || []);
+                const ordersList = data.orders?.data || data.orders || [];
+                setOrders(Array.isArray(ordersList) ? ordersList : []);
+                calculateStats(ordersList);
             }
         } catch (error) {
             console.error('Failed to load orders:', error);
+            setOrders([]);
         } finally {
             setLoading(false);
         }
     };
 
     const calculateStats = (ordersData) => {
+        if (!Array.isArray(ordersData)) {
+            setStats({ total: 0, pending: 0, preparing: 0, ready: 0, completed: 0 });
+            return;
+        }
+
         const stats = {
             total: ordersData.length,
             pending: ordersData.filter(o => o.status === 'pending').length,
@@ -69,13 +80,13 @@ export default function OrdersIndex() {
     };
 
     // Filter orders by search
-    const filteredOrders = orders.filter(order => {
+    const filteredOrders = Array.isArray(orders) ? orders.filter(order => {
         const searchLower = searchQuery.toLowerCase();
         return (
             order.order_id?.toLowerCase().includes(searchLower) ||
             order.mobile_number?.toLowerCase().includes(searchLower)
         );
-    });
+    }) : [];
 
     const getStatusBadge = (status) => {
         const badges = {
@@ -114,6 +125,7 @@ export default function OrdersIndex() {
     };
 
     const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', {
             month: 'short',
@@ -125,7 +137,35 @@ export default function OrdersIndex() {
     };
 
     const handleViewOrder = (orderId) => {
-        router.visit(route('customer.orders.detail', orderId));
+        // Make sure orderId is valid
+        if (!orderId) {
+            console.error('Order ID is missing');
+            return;
+        }
+
+        // Convert MongoDB ObjectId to string if needed
+        const id = typeof orderId === 'object' ? String(orderId) : orderId;
+
+        try {
+            // Use the route with proper parameter
+            router.visit(route('customer.orders.detail', { id: id }));
+        } catch (error) {
+            console.error('Route error:', error);
+            // Fallback to manual URL construction
+            router.visit(`/customer/orders/${id}`);
+        }
+    };
+
+    const parseItems = (itemsData) => {
+        if (Array.isArray(itemsData)) return itemsData;
+        if (typeof itemsData === 'string') {
+            try {
+                return JSON.parse(itemsData);
+            } catch {
+                return [];
+            }
+        }
+        return [];
     };
 
     return (
@@ -273,103 +313,107 @@ export default function OrdersIndex() {
                                 </div>
                             </div>
                         ) : (
-                            filteredOrders.map((order) => (
-                                <div key={order._id} className="bg-white rounded-xl border border-gray-200 hover:shadow-md transition-shadow">
-                                    <div className="p-6">
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <h3 className="text-lg font-semibold text-gray-900">
-                                                        {order.order_id}
-                                                    </h3>
-                                                    {getStatusBadge(order.status)}
+                            filteredOrders.map((order) => {
+                                const items = parseItems(order.items);
+
+                                return (
+                                    <div key={order.id || order._id} className="bg-white rounded-xl border border-gray-200 hover:shadow-md transition-shadow">
+                                        <div className="p-6">
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <h3 className="text-lg font-semibold text-gray-900">
+                                                            {order.order_id}
+                                                        </h3>
+                                                        {getStatusBadge(order.status)}
+                                                    </div>
+                                                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Calendar className="w-4 h-4" />
+                                                            <span>{formatDate(order.created_at)}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <MapPin className="w-4 h-4" />
+                                                            <span>Pickup Order</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-4 text-sm text-gray-600">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Calendar className="w-4 h-4" />
-                                                        <span>{formatDate(order.created_at)}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <MapPin className="w-4 h-4" />
-                                                        <span>Pickup Order</span>
-                                                    </div>
+                                                <button
+                                                    onClick={() => handleViewOrder(order.id || order._id)}
+                                                    className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                    View Details
+                                                </button>
+                                            </div>
+
+                                            {/* Order Items Preview */}
+                                            <div className="mb-4">
+                                                <p className="text-sm text-gray-600 mb-2">Items:</p>
+                                                <div className="space-y-2">
+                                                    {items.slice(0, 3).map((item, idx) => (
+                                                        <div key={idx} className="flex items-center gap-3 text-sm">
+                                                            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                                <Package className="w-5 h-5 text-blue-600" />
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <p className="font-medium text-gray-900">{item.product_name}</p>
+                                                                <p className="text-gray-500">Qty: {item.quantity}</p>
+                                                            </div>
+                                                            {item.unit_price && (
+                                                                <p className="font-medium text-gray-900">
+                                                                    ₱{(item.unit_price * item.quantity).toFixed(2)}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    {items.length > 3 && (
+                                                        <p className="text-sm text-gray-500 pl-13">
+                                                            +{items.length - 3} more items
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={() => handleViewOrder(order._id)}
-                                                className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors"
-                                            >
-                                                <Eye className="w-4 h-4" />
-                                                View Details
-                                            </button>
-                                        </div>
 
-                                        {/* Order Items Preview */}
-                                        <div className="mb-4">
-                                            <p className="text-sm text-gray-600 mb-2">Items:</p>
-                                            <div className="space-y-2">
-                                                {(order.items || []).slice(0, 3).map((item, idx) => (
-                                                    <div key={idx} className="flex items-center gap-3 text-sm">
-                                                        <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                            <Package className="w-5 h-5 text-blue-600" />
+                                            {/* Order Footer */}
+                                            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                                                <div className="flex items-center gap-4">
+                                                    {order.payment_method && (
+                                                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                                                            <DollarSign className="w-4 h-4" />
+                                                            <span className="capitalize">{order.payment_method}</span>
+                                                            {getPaymentStatusBadge(order.payment_status)}
                                                         </div>
-                                                        <div className="flex-1">
-                                                            <p className="font-medium text-gray-900">{item.product_name}</p>
-                                                            <p className="text-gray-500">Qty: {item.quantity}</p>
-                                                        </div>
-                                                        {item.unit_price && (
-                                                            <p className="font-medium text-gray-900">
-                                                                ₱{(item.unit_price * item.quantity).toFixed(2)}
+                                                    )}
+                                                </div>
+                                                {order.total_amount && (
+                                                    <div className="text-right">
+                                                        <p className="text-sm text-gray-600">Total Amount</p>
+                                                        <p className="text-xl font-bold text-gray-900">
+                                                            ₱{Number(order.total_amount).toFixed(2)}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Ready for Pickup Alert */}
+                                            {order.status === 'ready_for_pickup' && (
+                                                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
+                                                    <div className="flex gap-3">
+                                                        <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <p className="text-sm font-medium text-green-900">Ready for Pickup!</p>
+                                                            <p className="text-sm text-green-700 mt-1">
+                                                                Your order is ready. Please visit our pharmacy to collect it.
                                                             </p>
-                                                        )}
+                                                        </div>
                                                     </div>
-                                                ))}
-                                                {(order.items || []).length > 3 && (
-                                                    <p className="text-sm text-gray-500 pl-13">
-                                                        +{order.items.length - 3} more items
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Order Footer */}
-                                        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                                            <div className="flex items-center gap-4">
-                                                {order.payment_method && (
-                                                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                        <DollarSign className="w-4 h-4" />
-                                                        <span className="capitalize">{order.payment_method}</span>
-                                                        {getPaymentStatusBadge(order.payment_status)}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {order.total_amount && (
-                                                <div className="text-right">
-                                                    <p className="text-sm text-gray-600">Total Amount</p>
-                                                    <p className="text-xl font-bold text-gray-900">
-                                                        ₱{Number(order.total_amount).toFixed(2)}
-                                                    </p>
                                                 </div>
                                             )}
                                         </div>
-
-                                        {/* Ready for Pickup Alert */}
-                                        {order.status === 'ready_for_pickup' && (
-                                            <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
-                                                <div className="flex gap-3">
-                                                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                                                    <div>
-                                                        <p className="text-sm font-medium text-green-900">Ready for Pickup!</p>
-                                                        <p className="text-sm text-green-700 mt-1">
-                                                            Your order is ready. Please visit our pharmacy to collect it.
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>
