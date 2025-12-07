@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AdminAuthController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\ConversationController;
@@ -156,7 +157,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('/prescriptions/{id}/verify', [PrescriptionController::class, 'verify'])->name('prescriptions.verify');
             Route::post('/prescriptions/{id}/reject', [PrescriptionController::class, 'reject'])->name('prescriptions.reject');
             Route::get('/prescriptions/{id}/download', [PrescriptionController::class, 'download'])->name('prescriptions.download');
-            
+
+            // Admin order management
+            Route::post('/orders/{id}/mark-ready', [OrderController::class, 'markReadyForPickup'])->name('orders.mark-ready');
+            Route::post('/orders/{id}/complete-pickup', [OrderController::class, 'completePickup'])->name('orders.complete-pickup');
+            Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
+
             // Order management through prescriptions
             Route::post('/prescriptions/{id}/complete-order', [PrescriptionController::class, 'completeOrder'])->name('prescriptions.complete-order');
             Route::post('/prescriptions/{id}/cancel-order', [PrescriptionController::class, 'cancelOrder'])->name('prescriptions.cancel-order');
@@ -217,21 +223,69 @@ Route::prefix('customer')->name('customer.')->group(function () {
         Route::get('/profile', [CustomerAuthController::class, 'profile'])->name('profile');
         Route::put('/profile', [CustomerAuthController::class, 'updateProfile'])->name('profile.update');
         Route::post('/profile/change-password', [CustomerAuthController::class, 'changePassword'])->name('profile.change-password');
-        
+
+        // Products page
+        Route::get('/products', function () {
+            return Inertia::render('Customer/Products/Index');
+        })->name('products');
+
+        Route::get('/orders/{id}', function ($id) {
+            try {
+                $order = \App\Models\Order::where('_id', $id)
+                    ->where('customer_id', auth()->id())
+                    ->firstOrFail();
+
+                return Inertia::render('Customer/Orders/Detail', [
+                    'order' => $order
+                ]);
+            } catch (\Exception $e) {
+                return redirect()->route('customer.orders')
+                    ->with('error', 'Order not found');
+            }
+        })->name('orders.detail');
+
+        // Checkout page
+        Route::get('/checkout', function () {
+            return Inertia::render('Customer/Checkout');
+        })->name('checkout');
+
+        // Orders page
+        Route::get('/orders', function () {
+            return Inertia::render('Customer/Orders/Index');
+        })->name('orders');
+
         // Prescriptions/Orders page
         Route::get('/prescriptions', function () {
             return Inertia::render('Customer/Prescriptions/Index');
         })->name('prescriptions');
 
         Route::get('/prescriptions/{id}', function ($id) {
-            return Inertia::render('Customer/Prescriptions/Detail');
+            try {
+                $prescription = \App\Models\Prescription::with(['customer', 'order'])
+                    ->where('_id', $id)
+                    ->where('customer_id', auth()->id())
+                    ->firstOrFail();
+
+                return Inertia::render('Customer/Prescriptions/Detail', [
+                    'prescription' => $prescription
+                ]);
+            } catch (\Exception $e) {
+                return redirect()->route('customer.prescriptions')
+                    ->with('error', 'Prescription not found');
+            }
         })->name('prescriptions.detail');
-        
+
+
+        Route::get('/conversations', function () {
+            return Inertia::render('Customer/Conversations/Index');
+        })->name('conversations');
+
+
         // Notifications page
         Route::get('/notifications', function () {
             return Inertia::render('Customer/Notifications/Index');
         })->name('notifications');
-        
+
         Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('logout');
 
         // API routes
@@ -241,6 +295,9 @@ Route::prefix('customer')->name('customer.')->group(function () {
             Route::get('/products', [ProductController::class, 'index'])->name('products.index');
             Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
             Route::get('/products/search/{query}', [ProductController::class, 'search'])->name('products.search');
+
+            Route::get('/orders', [OrderController::class, 'customerOrders'])->name('orders.index');
+            Route::post('/orders/create', [OrderController::class, 'create'])->name('orders.create');
 
             // Prescriptions (now includes order management for customer)
             Route::get('/prescriptions', [PrescriptionController::class, 'customerPrescriptions'])->name('prescriptions.index');

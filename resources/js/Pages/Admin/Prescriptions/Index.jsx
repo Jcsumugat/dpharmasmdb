@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Head } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { Search, X, Plus, Trash2, FileText, Package, Eye, Loader2, Minus, CheckCircle } from 'lucide-react';
 
 export default function PrescriptionsIndex() {
     const [prescriptions, setPrescriptions] = useState([]);
@@ -38,6 +39,11 @@ export default function PrescriptionsIndex() {
     const [paymentMethod, setPaymentMethod] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
 
+    // Product search for adding items
+    const [productSearch, setProductSearch] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+
     useEffect(() => {
         fetchPrescriptions();
     }, [filters.status, filters.order_type, pagination.current_page]);
@@ -72,6 +78,39 @@ export default function PrescriptionsIndex() {
         }
     };
 
+    // Search products from inventory
+    const searchProducts = async (query) => {
+        if (!query || query.length < 2) {
+            setSearchResults([]);
+            return;
+        }
+
+        setSearchLoading(true);
+        try {
+            const response = await fetch(`/admin/api/products?search=${encodeURIComponent(query)}&per_page=10`);
+            const data = await response.json();
+
+            if (data.success && data.products) {
+                setSearchResults(data.products.data || []);
+            }
+        } catch (error) {
+            console.error('Product search failed:', error);
+        } finally {
+            setSearchLoading(false);
+        }
+    };
+
+    // Debounce product search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (productSearch) {
+                searchProducts(productSearch);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [productSearch]);
+
     const handleStatusFilter = (status) => {
         setFilters(prev => ({ ...prev, status }));
         setPagination(prev => ({ ...prev, current_page: 1 }));
@@ -83,44 +122,113 @@ export default function PrescriptionsIndex() {
     };
 
     const handleViewDetails = async (prescription) => {
+        const prescriptionId = prescription._id || prescription.id;
+
+        if (!prescriptionId) {
+            console.error('No prescription ID found:', prescription);
+            alert('Unable to load prescription details - missing ID');
+            return;
+        }
+
         try {
-            const response = await fetch(`/admin/api/prescriptions/${prescription._id}`);
+            const response = await fetch(`/admin/api/prescriptions/${prescriptionId}`);
             const data = await response.json();
             if (data.success) {
-                setSelectedPrescription(data.prescription);
+                // Ensure the prescription object has both _id and id for compatibility
+                const prescriptionData = {
+                    ...data.prescription,
+                    _id: data.prescription._id || data.prescription.id,
+                    id: data.prescription.id || data.prescription._id
+                };
+                setSelectedPrescription(prescriptionData);
                 setShowDetailsModal(true);
+            } else {
+                console.error('Failed to fetch prescription:', data);
+                alert(data.message || 'Failed to load prescription details');
             }
         } catch (error) {
             console.error('Failed to fetch prescription details:', error);
+            alert('Failed to load prescription details. Please try again.');
         }
     };
 
     const handleViewImage = (prescription) => {
+        const prescriptionId = prescription._id || prescription.id;
+
+        if (!prescriptionId) {
+            console.error('No prescription ID found:', prescription);
+            alert('Unable to view file - missing prescription ID');
+            return;
+        }
+
         setSelectedPrescription(prescription);
         setShowImageModal(true);
     };
 
     const handleInitiateApproval = (prescription) => {
         setSelectedPrescription(prescription);
-        if (prescription.items && prescription.items.length > 0) {
+
+        // Use customer's pre-selected items if available
+        if (prescription.requested_items && prescription.requested_items.length > 0) {
+            setApprovalItems(prescription.requested_items.map(item => ({
+                product_id: item.product_id,
+                product_name: item.product_name,
+                brand_name: item.brand_name || '',
+                generic_name: item.generic_name || '',
+                quantity: item.quantity || 1,
+                unit_price: item.unit_price || 0,
+                unit: item.unit || 'piece',
+                unit_quantity: item.unit_quantity || 1,
+                form_type: item.form_type || 'piece',
+                status: 'available'
+            })));
+        } else if (prescription.items && prescription.items.length > 0) {
             setApprovalItems(prescription.items);
         } else {
-            setApprovalItems([{
-                product_id: '',
-                product_name: '',
-                quantity: 1,
-                unit_price: 0,
-                status: 'available'
-            }]);
+            setApprovalItems([]);
         }
+
         setShowDetailsModal(false);
         setShowApproveModal(true);
     };
 
-    const handleAddItem = () => {
+    const handleAddProductToApproval = (product) => {
+        const productId = product._id || product.id;
+        const sellingPrice = product.selling_price || product.sale_price || 0;
+
+        // Check if product already exists
+        const existingIndex = approvalItems.findIndex(item => item.product_id === productId);
+
+        if (existingIndex >= 0) {
+            // Increment quantity if exists
+            const newItems = [...approvalItems];
+            newItems[existingIndex].quantity += 1;
+            setApprovalItems(newItems);
+        } else {
+            // Add new item
+            setApprovalItems([...approvalItems, {
+                product_id: productId,
+                product_name: product.product_name || 'Unknown Product',
+                brand_name: product.brand_name || product.manufacturer || '',
+                generic_name: product.generic_name || '',
+                quantity: 1,
+                unit_price: sellingPrice,
+                unit: product.display_unit || product.unit || 'piece',
+                unit_quantity: product.display_unit_quantity || product.unit_quantity || 1,
+                form_type: product.form_type || 'piece',
+                status: 'available'
+            }]);
+        }
+
+        setProductSearch('');
+        setSearchResults([]);
+    };
+
+    const handleAddEmptyItem = () => {
         setApprovalItems([...approvalItems, {
             product_id: '',
             product_name: '',
+            brand_name: '',
             quantity: 1,
             unit_price: 0,
             status: 'available'
@@ -137,8 +245,34 @@ export default function PrescriptionsIndex() {
         setApprovalItems(newItems);
     };
 
+    const handleUpdateQuantity = (index, delta) => {
+        const newItems = [...approvalItems];
+        const newQuantity = Math.max(1, newItems[index].quantity + delta);
+        newItems[index].quantity = newQuantity;
+        setApprovalItems(newItems);
+    };
+
+    const formatUnitDisplay = (item) => {
+        if (!item.unit_quantity || item.unit_quantity === 1) {
+            return item.form_type ? item.form_type.charAt(0).toUpperCase() + item.form_type.slice(1) : 'Piece';
+        }
+
+        const pluralForm = item.form_type ?
+            (item.form_type.endsWith('s') ? item.form_type : item.form_type + 's') :
+            'pieces';
+
+        return `${item.unit} of ${item.unit_quantity} ${pluralForm}`;
+    };
+
     const handleApprovePrescription = async () => {
         if (!selectedPrescription) return;
+
+        const prescriptionId = selectedPrescription._id || selectedPrescription.id;
+
+        if (!prescriptionId) {
+            alert('Unable to approve prescription - missing ID');
+            return;
+        }
 
         const invalidItems = approvalItems.some(item =>
             !item.product_name || item.quantity < 1 || item.unit_price < 0
@@ -151,7 +285,7 @@ export default function PrescriptionsIndex() {
 
         setActionLoading(true);
         try {
-            const response = await fetch(`/admin/api/prescriptions/${selectedPrescription._id}/verify`, {
+            const response = await fetch(`/admin/api/prescriptions/${prescriptionId}/verify`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -188,9 +322,16 @@ export default function PrescriptionsIndex() {
             return;
         }
 
+        const prescriptionId = selectedPrescription._id || selectedPrescription.id;
+
+        if (!prescriptionId) {
+            alert('Unable to decline prescription - missing ID');
+            return;
+        }
+
         setActionLoading(true);
         try {
-            const response = await fetch(`/admin/api/prescriptions/${selectedPrescription._id}/reject`, {
+            const response = await fetch(`/admin/api/prescriptions/${prescriptionId}/reject`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -221,9 +362,16 @@ export default function PrescriptionsIndex() {
     const handleUpdateOrderStatus = async () => {
         if (!selectedPrescription || !orderStatus) return;
 
+        const prescriptionId = selectedPrescription._id || selectedPrescription.id;
+
+        if (!prescriptionId) {
+            alert('Unable to update order status - missing ID');
+            return;
+        }
+
         setActionLoading(true);
         try {
-            const response = await fetch(`/admin/api/prescriptions/${selectedPrescription._id}/update-order-status`, {
+            const response = await fetch(`/admin/api/prescriptions/${prescriptionId}/update-order-status`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -253,9 +401,16 @@ export default function PrescriptionsIndex() {
     const handleUpdatePaymentStatus = async () => {
         if (!selectedPrescription || !paymentStatus) return;
 
+        const prescriptionId = selectedPrescription._id || selectedPrescription.id;
+
+        if (!prescriptionId) {
+            alert('Unable to update payment status - missing ID');
+            return;
+        }
+
         setActionLoading(true);
         try {
-            const response = await fetch(`/admin/api/prescriptions/${selectedPrescription._id}/update-payment-status`, {
+            const response = await fetch(`/admin/api/prescriptions/${prescriptionId}/update-payment-status`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -348,7 +503,7 @@ export default function PrescriptionsIndex() {
             setActionLoading(false);
         }
     };
-
+    
     const getStatusBadge = (status) => {
         const badges = {
             pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -455,8 +610,8 @@ export default function PrescriptionsIndex() {
                                 <button
                                     onClick={() => handleStatusFilter('')}
                                     className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.status === ''
-                                            ? 'bg-indigo-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                         }`}
                                 >
                                     All Status
@@ -464,8 +619,8 @@ export default function PrescriptionsIndex() {
                                 <button
                                     onClick={() => handleStatusFilter('pending')}
                                     className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.status === 'pending'
-                                            ? 'bg-yellow-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        ? 'bg-yellow-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                         }`}
                                 >
                                     Pending Review
@@ -473,8 +628,8 @@ export default function PrescriptionsIndex() {
                                 <button
                                     onClick={() => handleStatusFilter('approved')}
                                     className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.status === 'approved'
-                                            ? 'bg-green-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        ? 'bg-green-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                         }`}
                                 >
                                     Active Orders
@@ -482,8 +637,8 @@ export default function PrescriptionsIndex() {
                                 <button
                                     onClick={() => handleStatusFilter('completed')}
                                     className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.status === 'completed'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                         }`}
                                 >
                                     Completed
@@ -491,8 +646,8 @@ export default function PrescriptionsIndex() {
                                 <button
                                     onClick={() => handleStatusFilter('declined')}
                                     className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.status === 'declined'
-                                            ? 'bg-red-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        ? 'bg-red-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                         }`}
                                 >
                                     Declined
@@ -507,8 +662,8 @@ export default function PrescriptionsIndex() {
                                 <button
                                     onClick={() => handleTypeFilter('')}
                                     className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.order_type === ''
-                                            ? 'bg-indigo-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                         }`}
                                 >
                                     All Types
@@ -516,8 +671,8 @@ export default function PrescriptionsIndex() {
                                 <button
                                     onClick={() => handleTypeFilter('prescription')}
                                     className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.order_type === 'prescription'
-                                            ? 'bg-purple-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        ? 'bg-purple-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                         }`}
                                 >
                                     Prescription
@@ -525,8 +680,8 @@ export default function PrescriptionsIndex() {
                                 <button
                                     onClick={() => handleTypeFilter('online_order')}
                                     className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.order_type === 'online_order'
-                                            ? 'bg-indigo-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                         }`}
                                 >
                                     Online Order
@@ -544,9 +699,7 @@ export default function PrescriptionsIndex() {
                         </div>
                     ) : prescriptions.length === 0 ? (
                         <div className="text-center py-20">
-                            <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
+                            <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
                             <p className="text-gray-500 text-lg">No prescriptions/orders found</p>
                         </div>
                     ) : (
@@ -566,77 +719,95 @@ export default function PrescriptionsIndex() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
-                                    {prescriptions.map((prescription) => (
-                                        <tr key={prescription._id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <span className="font-mono text-sm font-semibold text-gray-900">
-                                                    {prescription.prescription_number}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="text-sm font-medium text-gray-900">
-                                                    {prescription.customer?.first_name} {prescription.customer?.last_name}
-                                                </div>
-                                                <div className="text-xs text-gray-500">
-                                                    {prescription.mobile_number}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getTypeBadge(prescription.order_type)}`}>
-                                                    {prescription.order_type === 'prescription' ? 'RX' : 'Order'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(prescription.status)}`}>
-                                                    {prescription.status?.toUpperCase()}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {prescription.order ? (
-                                                    <span className={`inline-flex px-2 py-1 rounded text-xs font-semibold ${getOrderStatusBadge(prescription.order.status)}`}>
-                                                        {prescription.order.status?.replace('_', ' ').toUpperCase()}
+                                    {prescriptions.map((prescription) => {
+                                        const prescriptionId = prescription._id || prescription.id;
+
+                                        return (
+                                            <tr key={prescriptionId} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <span className="font-mono text-sm font-semibold text-gray-900">
+                                                        {prescription.prescription_number}
                                                     </span>
-                                                ) : (
-                                                    <span className="text-xs text-gray-400">No order</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className="text-sm text-gray-900">
-                                                    {prescription.items?.length || 0} items
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {prescription.items?.length > 0 ? (
-                                                    <span className="text-sm font-semibold text-gray-900">
-                                                        {formatCurrency(calculateTotal(prescription.items))}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="text-sm font-medium text-gray-900">
+                                                        {prescription.customer?.first_name} {prescription.customer?.last_name}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {prescription.mobile_number}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getTypeBadge(prescription.order_type)}`}>
+                                                        {prescription.order_type === 'prescription' ? (
+                                                            <><FileText className="w-3 h-3" /> RX</>
+                                                        ) : (
+                                                            <><Package className="w-3 h-3" /> Order</>
+                                                        )}
                                                     </span>
-                                                ) : (
-                                                    <span className="text-sm text-gray-400">-</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className="text-sm text-gray-600">
-                                                    {formatDate(prescription.created_at)}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => handleViewDetails(prescription)}
-                                                        className="text-indigo-600 hover:text-indigo-800 font-medium text-sm"
-                                                    >
-                                                        Details
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleViewImage(prescription)}
-                                                        className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                                                    >
-                                                        View File
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(prescription.status)}`}>
+                                                        {prescription.status?.toUpperCase()}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {prescription.order ? (
+                                                        <span className={`inline-flex px-2 py-1 rounded text-xs font-semibold ${getOrderStatusBadge(prescription.order.status)}`}>
+                                                            {prescription.order.status?.replace('_', ' ').toUpperCase()}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">No order</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="text-sm">
+                                                        <span className="font-semibold text-gray-900">
+                                                            {prescription.items?.length || prescription.requested_items?.length || 0}
+                                                        </span>
+                                                        <span className="text-gray-600"> items</span>
+                                                        {prescription.requested_items && prescription.requested_items.length > 0 && !prescription.items && (
+                                                            <span className="ml-2 text-xs text-blue-600">(Pre-selected)</span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {prescription.items?.length > 0 ? (
+                                                        <span className="text-sm font-semibold text-gray-900">
+                                                            {formatCurrency(calculateTotal(prescription.items))}
+                                                        </span>
+                                                    ) : prescription.requested_items?.length > 0 ? (
+                                                        <span className="text-sm font-semibold text-blue-600">
+                                                            {formatCurrency(calculateTotal(prescription.requested_items))}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-sm text-gray-400">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-sm text-gray-600">
+                                                        {formatDate(prescription.created_at)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => handleViewDetails(prescription)}
+                                                            className="text-indigo-600 hover:text-indigo-800 font-medium text-sm"
+                                                        >
+                                                            Details
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleViewImage(prescription)}
+                                                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                                                        >
+                                                            View File
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -670,7 +841,6 @@ export default function PrescriptionsIndex() {
                     )}
                 </div>
             </div>
-
             {/* Details Modal */}
             {showDetailsModal && selectedPrescription && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -684,9 +854,7 @@ export default function PrescriptionsIndex() {
                                 onClick={() => setShowDetailsModal(false)}
                                 className="text-gray-400 hover:text-gray-600"
                             >
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <X className="w-6 h-6" />
                             </button>
                         </div>
 
@@ -779,19 +947,72 @@ export default function PrescriptionsIndex() {
                                 </div>
                             )}
 
-                            {/* Items */}
+                            {/* Customer Pre-Selected Items */}
+                            {selectedPrescription.requested_items && selectedPrescription.requested_items.length > 0 && (
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                        <Package className="w-5 h-5 text-blue-600" />
+                                        Customer Pre-Selected Items
+                                        <span className="text-sm font-normal text-blue-600">(Not yet verified)</span>
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {selectedPrescription.requested_items.map((item, index) => (
+                                            <div key={index} className="flex justify-between items-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                                <div className="flex-1">
+                                                    <p className="font-medium text-gray-900">{item.product_name}</p>
+                                                    {item.brand_name && (
+                                                        <p className="text-sm text-gray-600">{item.brand_name}</p>
+                                                    )}
+                                                    <p className="text-sm text-gray-600">
+                                                        Qty: {item.quantity} × {formatCurrency(item.unit_price)}
+                                                        {item.unit && item.unit_quantity && item.unit_quantity > 1 && (
+                                                            <span className="ml-2 text-xs text-gray-500">
+                                                                ({item.unit} of {item.unit_quantity} {item.form_type})
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                                <p className="font-semibold text-gray-900">
+                                                    {formatCurrency(item.unit_price * item.quantity)}
+                                                </p>
+                                            </div>
+                                        ))}
+                                        <div className="bg-blue-100 border border-blue-300 rounded-lg p-3">
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-semibold text-blue-900">Estimated Total:</span>
+                                                <span className="text-lg font-bold text-blue-900">
+                                                    {formatCurrency(calculateTotal(selectedPrescription.requested_items))}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-blue-700 mt-1">* Subject to pharmacist verification</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Approved Items */}
                             {selectedPrescription.items && selectedPrescription.items.length > 0 && (
                                 <div>
-                                    <h3 className="text-lg font-bold text-gray-900 mb-3">Order Items</h3>
+                                    <h3 className="text-lg font-bold text-gray-900 mb-3">Approved Order Items</h3>
                                     <div className="space-y-2">
                                         {selectedPrescription.items.map((item, index) => (
                                             <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                                                 <div className="flex-1">
                                                     <p className="font-medium text-gray-900">{item.product_name}</p>
-                                                    <p className="text-sm text-gray-600">Qty: {item.quantity} × {formatCurrency(item.unit_price)}</p>
+                                                    {item.brand_name && (
+                                                        <p className="text-sm text-gray-600">{item.brand_name}</p>
+                                                    )}
+                                                    <p className="text-sm text-gray-600">
+                                                        Qty: {item.quantity} × {formatCurrency(item.unit_price)}
+                                                        {item.unit && item.unit_quantity && item.unit_quantity > 1 && (
+                                                            <span className="ml-2 text-xs text-gray-500">
+                                                                ({item.unit} of {item.unit_quantity} {item.form_type})
+                                                            </span>
+                                                        )}
+                                                    </p>
                                                     <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium mt-1 ${item.status === 'available'
-                                                            ? 'bg-green-100 text-green-800'
-                                                            : 'bg-red-100 text-red-800'
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : 'bg-red-100 text-red-800'
                                                         }`}>
                                                         {item.status}
                                                     </span>
@@ -821,8 +1042,9 @@ export default function PrescriptionsIndex() {
                                     </div>
                                     <button
                                         onClick={() => handleViewImage(selectedPrescription)}
-                                        className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                                        className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center gap-1"
                                     >
+                                        <Eye className="w-4 h-4" />
                                         View File
                                     </button>
                                 </div>
@@ -899,130 +1121,317 @@ export default function PrescriptionsIndex() {
                 </div>
             )}
 
-            {/* Approve Modal */}
+            {/* Approve Modal with Product Search and Image Reference */}
             {showApproveModal && selectedPrescription && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
-                            <h2 className="text-xl font-bold text-gray-900">Approve Prescription & Create Order</h2>
-                            <p className="text-sm text-gray-600">{selectedPrescription.prescription_number}</p>
-                        </div>
-
-                        <div className="p-6 space-y-6">
-                            {/* Items List */}
-                            <div>
-                                <div className="flex justify-between items-center mb-3">
-                                    <label className="text-sm font-semibold text-gray-700">Order Items</label>
-                                    <button
-                                        onClick={handleAddItem}
-                                        className="px-3 py-1 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
-                                    >
-                                        + Add Item
-                                    </button>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                    <div className="bg-white rounded-2xl w-full max-w-7xl my-8 max-h-[95vh] flex flex-col">
+                        {/* Header */}
+                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl z-10">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-900">Approve Prescription & Create Order</h2>
+                                    <p className="text-sm text-gray-600">{selectedPrescription.prescription_number}</p>
                                 </div>
-
-                                <div className="space-y-3">
-                                    {approvalItems.map((item, index) => (
-                                        <div key={index} className="border border-gray-200 rounded-lg p-4">
-                                            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                                                <div className="md:col-span-2">
-                                                    <label className="text-xs font-medium text-gray-600 block mb-1">Product Name</label>
-                                                    <input
-                                                        type="text"
-                                                        value={item.product_name}
-                                                        onChange={(e) => handleItemChange(index, 'product_name', e.target.value)}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-                                                        placeholder="Enter product name"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs font-medium text-gray-600 block mb-1">Quantity</label>
-                                                    <input
-                                                        type="number"
-                                                        value={item.quantity}
-                                                        onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 1)}
-                                                        min="1"
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs font-medium text-gray-600 block mb-1">Price (₱)</label>
-                                                    <input
-                                                        type="number"
-                                                        value={item.unit_price}
-                                                        onChange={(e) => handleItemChange(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                                                        min="0"
-                                                        step="0.01"
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs font-medium text-gray-600 block mb-1">Status</label>
-                                                    <select
-                                                        value={item.status}
-                                                        onChange={(e) => handleItemChange(index, 'status', e.target.value)}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
-                                                    >
-                                                        <option value="available">Available</option>
-                                                        <option value="out_of_stock">Out of Stock</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-200">
-                                                <div className="text-sm font-semibold text-gray-900">
-                                                    Subtotal: {formatCurrency(item.quantity * item.unit_price)}
-                                                </div>
-                                                {approvalItems.length > 1 && (
-                                                    <button
-                                                        onClick={() => handleRemoveItem(index)}
-                                                        className="text-red-600 hover:text-red-800 text-sm font-medium"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="bg-gray-50 p-4 rounded-lg mt-4">
-                                    <div className="flex justify-between items-center text-lg font-bold">
-                                        <span>Total Amount:</span>
-                                        <span className="text-indigo-600">{formatCurrency(calculateTotal(approvalItems))}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Admin Message */}
-                            <div>
-                                <label className="text-sm font-semibold text-gray-700 block mb-2">Message to Customer (Optional)</label>
-                                <textarea
-                                    value={adminMessage}
-                                    onChange={(e) => setAdminMessage(e.target.value)}
-                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
-                                    rows="3"
-                                    placeholder="Add any additional message for the customer..."
-                                />
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex gap-3 pt-4 border-t">
                                 <button
                                     onClick={() => {
                                         setShowApproveModal(false);
                                         setShowDetailsModal(true);
                                     }}
+                                    className="text-gray-400 hover:text-gray-600"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Split View Content */}
+                        <div className="flex-1 overflow-hidden flex">
+                            {/* Left Side - Product Search and Order Items */}
+                            <div className="w-1/2 p-6 overflow-y-auto border-r border-gray-200">
+                                <div className="space-y-6">
+                                    {/* Product Search */}
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-700 mb-2 block">Search & Add Products from Inventory</label>
+                                        <div className="relative">
+                                            <div className="relative">
+                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search by product name, brand, or generic name..."
+                                                    value={productSearch}
+                                                    onChange={(e) => setProductSearch(e.target.value)}
+                                                    className="w-full pl-10 pr-10 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                                />
+                                                {searchLoading && (
+                                                    <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-indigo-600 animate-spin" />
+                                                )}
+                                            </div>
+
+                                            {/* Search Results Dropdown */}
+                                            {searchResults.length > 0 && (
+                                                <div className="absolute z-50 w-full mt-2 bg-white border-2 border-indigo-200 rounded-lg shadow-xl max-h-80 overflow-y-auto">
+                                                    {searchResults.map((product) => (
+                                                        <button
+                                                            key={product._id || product.id}
+                                                            type="button"
+                                                            onClick={() => handleAddProductToApproval(product)}
+                                                            className="w-full px-4 py-3 text-left hover:bg-indigo-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                                                        >
+                                                            <div className="flex items-center justify-between gap-4">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="font-semibold text-gray-900 truncate">{product.product_name}</p>
+                                                                    <p className="text-sm text-gray-600 truncate">{product.brand_name || product.manufacturer}</p>
+                                                                    {product.generic_name && (
+                                                                        <p className="text-xs text-gray-500 truncate">{product.generic_name}</p>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-right flex-shrink-0">
+                                                                    <p className="text-sm font-bold text-indigo-600">
+                                                                        ₱{(product.selling_price || product.sale_price || 0).toFixed(2)}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500">
+                                                                        Stock: {product.stock_quantity || 0}
+                                                                    </p>
+                                                                    {product.display_unit && product.display_unit_quantity > 1 && (
+                                                                        <p className="text-xs text-blue-600">
+                                                                            {product.display_unit} of {product.display_unit_quantity}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                                            <span>💡</span>
+                                            <span>Reference the prescription image on the right while searching</span>
+                                        </p>
+                                    </div>
+
+                                    {/* Customer Pre-Selected Items Preview */}
+                                    {selectedPrescription.requested_items && selectedPrescription.requested_items.length > 0 && (
+                                        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+                                            <h4 className="text-sm font-bold text-blue-900 mb-2 flex items-center gap-2">
+                                                <Package className="w-4 h-4" />
+                                                Customer's Pre-Selected Items
+                                            </h4>
+                                            <p className="text-xs text-blue-700 mb-3">These items were pre-selected by the customer. Verify against prescription.</p>
+                                            <div className="space-y-2">
+                                                {selectedPrescription.requested_items.map((item, index) => (
+                                                    <div key={index} className="text-xs bg-white rounded-lg p-2 border border-blue-200">
+                                                        <p className="font-semibold text-gray-900">{item.product_name}</p>
+                                                        {item.brand_name && (
+                                                            <p className="text-gray-600">{item.brand_name}</p>
+                                                        )}
+                                                        <p className="text-gray-600 mt-1">Qty: {item.quantity} × ₱{item.unit_price.toFixed(2)}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Order Items List */}
+                                    <div>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <label className="text-sm font-semibold text-gray-700">
+                                                Order Items ({approvalItems.length})
+                                            </label>
+                                        </div>
+
+                                        {approvalItems.length === 0 ? (
+                                            <div className="text-center py-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
+                                                <Package className="w-16 h-16 text-gray-400 mx-auto mb-3" />
+                                                <p className="text-gray-600 font-medium">No items added yet</p>
+                                                <p className="text-sm text-gray-500 mt-2">Search and add products from inventory</p>
+                                                <div className="mt-4 flex items-center justify-center gap-2 text-sm text-indigo-600">
+                                                    <Search className="w-4 h-4" />
+                                                    <span>Use the search bar above</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {approvalItems.map((item, index) => (
+                                                    <div key={index} className="border-2 border-gray-200 rounded-xl p-4 bg-white hover:border-indigo-300 transition-colors">
+                                                        <div className="flex items-start justify-between gap-3 mb-3">
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="font-bold text-gray-900 text-base">{item.product_name}</p>
+                                                                {item.brand_name && (
+                                                                    <p className="text-sm text-gray-600">{item.brand_name}</p>
+                                                                )}
+                                                                {item.generic_name && (
+                                                                    <p className="text-xs text-gray-500 mt-0.5">{item.generic_name}</p>
+                                                                )}
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveItem(index)}
+                                                                className="flex items-center gap-1 text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors flex-shrink-0"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                                <span className="text-sm font-medium">Remove</span>
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <div>
+                                                                <label className="text-xs font-semibold text-gray-600 block mb-1">Unit Price</label>
+                                                                <div className="relative">
+                                                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">₱</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.unit_price}
+                                                                        onChange={(e) => handleItemChange(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                                        min="0"
+                                                                        step="0.01"
+                                                                        className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-xs font-semibold text-gray-600 block mb-1">Quantity</label>
+                                                                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleUpdateQuantity(index, -1)}
+                                                                        className="p-1.5 bg-white hover:bg-gray-200 rounded transition-colors"
+                                                                    >
+                                                                        <Minus className="w-4 h-4 text-gray-600" />
+                                                                    </button>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.quantity}
+                                                                        onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 1)}
+                                                                        min="1"
+                                                                        className="flex-1 px-2 py-1.5 border-0 bg-transparent text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleUpdateQuantity(index, 1)}
+                                                                        className="p-1.5 bg-white hover:bg-gray-200 rounded transition-colors"
+                                                                    >
+                                                                        <Plus className="w-4 h-4 text-gray-600" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {item.unit && item.unit_quantity && item.unit_quantity > 1 && (
+                                                            <div className="mt-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1.5 flex items-center gap-1">
+                                                                <Package className="w-3 h-3" />
+                                                                <span>Unit: {formatUnitDisplay(item)}</span>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center">
+                                                            <span className="text-sm text-gray-600">Subtotal:</span>
+                                                            <span className="text-lg font-bold text-indigo-600">
+                                                                {formatCurrency(item.quantity * item.unit_price)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {approvalItems.length > 0 && (
+                                            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-5 rounded-xl mt-4 shadow-lg">
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <p className="text-sm opacity-90 mb-1">Total Order Amount</p>
+                                                        <p className="text-3xl font-bold">{formatCurrency(calculateTotal(approvalItems))}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-sm opacity-90">{approvalItems.length} items</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Admin Message */}
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-700 block mb-2">Message to Customer (Optional)</label>
+                                        <textarea
+                                            value={adminMessage}
+                                            onChange={(e) => setAdminMessage(e.target.value)}
+                                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                            rows="3"
+                                            placeholder="Add any additional message for the customer (e.g., availability notes, alternatives suggested, etc.)"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Side - Prescription Image Reference */}
+                            <div className="w-1/2 p-6 overflow-y-auto bg-gray-50">
+                                <div className="sticky top-0 bg-gray-50 pb-3 mb-3 border-b border-gray-300 z-10">
+                                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                        <FileText className="w-5 h-5 text-indigo-600" />
+                                        Prescription Reference
+                                    </h3>
+                                    <p className="text-sm text-gray-600 mt-1">{selectedPrescription.original_filename}</p>
+                                </div>
+
+                                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                    {selectedPrescription.file_mime_type?.includes('pdf') ? (
+                                        <iframe
+                                            src={`/admin/api/prescriptions/${selectedPrescription._id || selectedPrescription.id}/download`}
+                                            className="w-full h-[calc(100vh-300px)]"
+                                            title="Prescription PDF"
+                                        />
+                                    ) : (
+                                        <div className="p-2">
+                                            <img
+                                                src={`/storage/${selectedPrescription.file_path}`}
+                                                alt="Prescription"
+                                                className="w-full h-auto rounded"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-4 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                                    <p className="text-sm text-indigo-800 flex items-start gap-2">
+                                        <Eye className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                        <span><strong>Tip:</strong> Cross-reference this prescription while searching products on the left. Verify medicine names, dosages, and quantities.</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className="sticky bottom-0 bg-white border-t-2 border-gray-200 px-6 py-4 rounded-b-2xl">
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowApproveModal(false);
+                                        setShowDetailsModal(true);
+                                    }}
                                     disabled={actionLoading}
-                                    className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl font-semibold hover:bg-gray-50 disabled:opacity-50"
+                                    className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 disabled:opacity-50 transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={handleApprovePrescription}
-                                    disabled={actionLoading}
-                                    className="flex-1 px-4 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50"
+                                    disabled={actionLoading || approvalItems.length === 0}
+                                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold rounded-xl hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg transition-all"
                                 >
-                                    {actionLoading ? 'Approving...' : 'Approve & Create Order'}
+                                    {actionLoading ? (
+                                        <>
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                            Approving Order...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle className="w-5 h-5" />
+                                            Approve & Create Order
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -1177,9 +1586,7 @@ export default function PrescriptionsIndex() {
                             onClick={() => setShowImageModal(false)}
                             className="absolute -top-12 right-0 text-white hover:text-gray-300"
                         >
-                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                            <X className="w-8 h-8" />
                         </button>
                         <div className="bg-white rounded-2xl p-4">
                             <h3 className="text-lg font-bold text-gray-900 mb-3">{selectedPrescription.original_filename}</h3>

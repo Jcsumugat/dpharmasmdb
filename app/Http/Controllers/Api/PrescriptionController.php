@@ -36,9 +36,9 @@ class PrescriptionController extends Controller
         // Search
         if ($request->has('search') && $request->search) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('prescription_number', 'like', "%{$search}%")
-                  ->orWhere('mobile_number', 'like', "%{$search}%");
+                    ->orWhere('mobile_number', 'like', "%{$search}%");
             });
         }
 
@@ -88,7 +88,7 @@ class PrescriptionController extends Controller
         }
 
         $prescriptions = $query->orderBy('created_at', 'desc')
-                              ->paginate($request->input('per_page', 20));
+            ->paginate($request->input('per_page', 20));
 
         return response()->json([
             'success' => true,
@@ -535,9 +535,6 @@ class PrescriptionController extends Controller
         ]);
     }
 
-    /**
-     * View prescription file
-     */
     public function download($id)
     {
         $prescription = Prescription::findOrFail($id);

@@ -142,10 +142,6 @@ class ProductController extends Controller
             'product' => $product
         ]);
     }
-
-    /**
-     * Get all products with available stock
-     */
     public function index(Request $request)
     {
         $query = Product::query();
@@ -155,7 +151,8 @@ class ProductController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('product_name', 'like', "%{$search}%")
                     ->orWhere('product_code', 'like', "%{$search}%")
-                    ->orWhere('brand_name', 'like', "%{$search}%");
+                    ->orWhere('brand_name', 'like', "%{$search}%")
+                    ->orWhere('generic_name', 'like', "%{$search}%");
             });
         }
 
@@ -169,7 +166,6 @@ class ProductController extends Controller
                     $query->where('stock_quantity', 0);
                     break;
                 case 'low_stock':
-                    // Use MongoDB $expr to compare fields
                     $query->where('stock_quantity', '>', 0)
                         ->whereRaw([
                             '$expr' => [
@@ -178,7 +174,6 @@ class ProductController extends Controller
                         ]);
                     break;
                 case 'in_stock':
-                    // Stock is above reorder level
                     $query->whereRaw([
                         '$expr' => [
                             '$gt' => ['$stock_quantity', '$reorder_level']
@@ -192,13 +187,57 @@ class ProductController extends Controller
             ->orderBy('product_name')
             ->paginate(20);
 
+        // FIX: Transform products to include FIFO batch data
         $products->getCollection()->transform(function ($product) {
+            // Get available batches sorted by expiration (FIFO)
             $availableBatches = $product->getAvailableBatches();
+            $firstBatch = $availableBatches->first(); // Get the first batch (nearest to expire)
 
+            // Calculate total available stock
             $product->available_stock = $availableBatches->sum('quantity_remaining');
             $product->batch_count = $availableBatches->count();
-            $product->earliest_expiry = $availableBatches->first()['expiration_date'] ?? null;
-            $product->current_price = $product->getCurrentPrice();
+
+            // FIX: Use the first batch's data for pricing and unit info
+            if ($firstBatch) {
+                $product->selling_price = (float) $firstBatch['sale_price'];
+                $product->unit_cost = (float) $firstBatch['unit_cost'];
+                $product->earliest_expiry = $firstBatch['expiration_date'];
+
+                // Use batch-specific unit info if available, otherwise use product defaults
+                $product->display_unit = $firstBatch['unit'] ?? $product->unit ?? 'piece';
+                $product->display_unit_quantity = isset($firstBatch['unit_quantity'])
+                    ? (float) $firstBatch['unit_quantity']
+                    : (float) ($product->unit_quantity ?? 1);
+            } else {
+                // No available batches - set defaults
+                $product->selling_price = 0;
+                $product->unit_cost = 0;
+                $product->earliest_expiry = null;
+                $product->display_unit = $product->unit ?? 'piece';
+                $product->display_unit_quantity = (float) ($product->unit_quantity ?? 1);
+            }
+
+            // Format unit display text
+            $product->unit_display_text = $this->formatUnitDisplay(
+                $product->display_unit,
+                $product->display_unit_quantity,
+                $product->form_type ?? 'piece'
+            );
+
+            // Ensure id is available for frontend
+            $product->id = (string) $product->_id;
+
+            // Log for debugging
+            Log::info('Product transformed with FIFO pricing', [
+                'product_id' => $product->_id,
+                'product_name' => $product->product_name,
+                'batch_count' => $product->batch_count,
+                'available_stock' => $product->available_stock,
+                'selling_price' => $product->selling_price,
+                'unit' => $product->display_unit,
+                'unit_quantity' => $product->display_unit_quantity,
+                'unit_display_text' => $product->unit_display_text
+            ]);
 
             return $product;
         });
@@ -207,6 +246,26 @@ class ProductController extends Controller
             'success' => true,
             'products' => $products
         ]);
+    }
+
+    /**
+     * Helper method to format unit display text
+     */
+    private function formatUnitDisplay($unit, $unitQuantity, $formType)
+    {
+        // If unit quantity is 1, just show the form type
+        if ($unitQuantity == 1) {
+            return ucfirst($formType);
+        }
+
+        // Pluralize form type
+        $pluralForm = $formType;
+        if (!str_ends_with($formType, 's')) {
+            $pluralForm = $formType . 's';
+        }
+
+        // Return formatted string like "Box of 10 tablets"
+        return ucfirst($unit) . ' of ' . $unitQuantity . ' ' . $pluralForm;
     }
 
     /**

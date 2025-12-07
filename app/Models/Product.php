@@ -37,7 +37,6 @@ class Product extends Model
         'reorder_level' => 'integer',
         'unit_quantity' => 'float',
         'notification_sent_at' => 'datetime',
-
     ];
 
     // Classification constants
@@ -74,9 +73,12 @@ class Product extends Model
         if (!$this->batches) return collect([]);
 
         return collect($this->batches)->filter(function ($batch) {
-            return $batch['quantity_remaining'] > 0
+            return isset($batch['quantity_remaining'])
+                && $batch['quantity_remaining'] > 0
+                && isset($batch['expiration_date'])
                 && Carbon::parse($batch['expiration_date'])->isFuture();
-        })->sortBy('expiration_date'); // FIFO
+        })->sortBy('expiration_date') // FIFO - Sort by expiration date (earliest first)
+          ->values(); // Reset array keys
     }
 
     public function getExpiredBatches()
@@ -84,10 +86,13 @@ class Product extends Model
         if (!$this->batches) return collect([]);
 
         return collect($this->batches)->filter(function ($batch) {
-            return $batch['quantity_remaining'] > 0
+            return isset($batch['quantity_remaining'])
+                && $batch['quantity_remaining'] > 0
+                && isset($batch['expiration_date'])
                 && Carbon::parse($batch['expiration_date'])->isPast();
         });
     }
+
     public function getBatchById($batchId)
     {
         if (!$this->batches) return null;
@@ -217,8 +222,9 @@ class Product extends Model
 
         return $allocation['batches'];
     }
+
     /**
-     * Add new batch
+     * Add new batch (FIX: Include unit and unit_quantity)
      */
     public function addBatch($batchData)
     {
@@ -228,13 +234,18 @@ class Product extends Model
             '_id' => new \MongoDB\BSON\ObjectId(),
             'batch_number' => $batchData['batch_number'],
             'expiration_date' => $batchData['expiration_date'],
-            'quantity_received' => $batchData['quantity_received'],
-            'quantity_remaining' => $batchData['quantity_remaining'] ?? $batchData['quantity_received'],
-            'unit_cost' => $batchData['unit_cost'],
-            'sale_price' => $batchData['sale_price'],
+            'quantity_received' => (int) $batchData['quantity_received'],
+            'quantity_remaining' => (int) ($batchData['quantity_remaining'] ?? $batchData['quantity_received']),
+            'unit_cost' => (float) $batchData['unit_cost'],
+            'sale_price' => (float) $batchData['sale_price'],
             'received_date' => $batchData['received_date'] ?? now(),
             'supplier_id' => $batchData['supplier_id'] ?? $this->supplier_id,
             'notes' => $batchData['notes'] ?? null,
+            // FIX: Store unit information in batch
+            'unit' => $batchData['unit'] ?? $this->unit,
+            'unit_quantity' => isset($batchData['unit_quantity'])
+                ? (float) $batchData['unit_quantity']
+                : (float) ($this->unit_quantity ?? 1),
             'expiration_notification_sent_at' => null,
             'created_at' => now(),
             'updated_at' => now(),
@@ -242,6 +253,8 @@ class Product extends Model
 
         $batches[] = $newBatch;
         $this->batches = $batches;
+
+        // Recalculate total stock from available batches
         $this->stock_quantity = $this->getAvailableStock();
         $this->save();
 
@@ -315,11 +328,18 @@ class Product extends Model
         return $batches[$batchIndex];
     }
 
-    // Pricing
+    // Pricing (FIX: Return float instead of potentially null/array)
     public function getCurrentPrice()
     {
         $nextBatch = $this->getAvailableBatches()->first();
-        return $nextBatch ? $nextBatch['sale_price'] : 0;
+        return $nextBatch ? (float) $nextBatch['sale_price'] : 0.0;
+    }
+
+    // NEW: Get current unit cost from first available batch (FIFO)
+    public function getCurrentUnitCost()
+    {
+        $nextBatch = $this->getAvailableBatches()->first();
+        return $nextBatch ? (float) $nextBatch['unit_cost'] : 0.0;
     }
 
     // Scopes

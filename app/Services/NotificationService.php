@@ -8,12 +8,46 @@ use App\Models\User;
 class NotificationService
 {
     /**
+     * Generic method to notify all admins
+     */
+    public static function notifyAdmins($type, $title, $message, $data = [], $priority = Notification::PRIORITY_MEDIUM)
+    {
+        $admins = User::whereIn('role', ['admin', 'staff'])->get();
+
+        foreach ($admins as $admin) {
+            Notification::createForUser(
+                $admin->_id,
+                $type,
+                $title,
+                $message,
+                $data,
+                $priority
+            );
+        }
+    }
+
+    /**
+     * Generic method to notify a specific customer
+     */
+    public static function notifyCustomer($customerId, $type, $title, $message, $data = [], $priority = Notification::PRIORITY_MEDIUM)
+    {
+        Notification::createForUser(
+            $customerId,
+            $type,
+            $title,
+            $message,
+            $data,
+            $priority
+        );
+    }
+
+    /**
      * Notify about new order (to admin/staff)
      */
     public static function notifyNewOrder($order)
     {
         $admins = User::whereIn('role', ['admin', 'staff'])->get();
-        
+
         foreach ($admins as $admin) {
             Notification::createForUser(
                 $admin->_id,
@@ -82,7 +116,7 @@ class NotificationService
     public static function notifyPrescriptionUploaded($prescription)
     {
         $admins = User::whereIn('role', ['admin', 'staff'])->get();
-        
+
         foreach ($admins as $admin) {
             Notification::createForUser(
                 $admin->_id,
@@ -192,7 +226,7 @@ class NotificationService
             [
                 'conversation_id' => (string) $conversation->_id,
                 'message_id' => (string) $message->_id,
-                'action_url' => auth()->user()->role === 'customer' 
+                'action_url' => auth()->user()->role === 'customer'
                     ? "/customer/conversations/{$conversation->_id}"
                     : "/admin/conversations/{$conversation->_id}",
                 'action_text' => 'View Message'
@@ -207,7 +241,7 @@ class NotificationService
     public static function notifyLowStock($product)
     {
         $admins = User::whereIn('role', ['admin', 'staff'])->get();
-        
+
         foreach ($admins as $admin) {
             Notification::createForUser(
                 $admin->_id,
@@ -232,7 +266,7 @@ class NotificationService
     public static function notifyOutOfStock($product)
     {
         $admins = User::whereIn('role', ['admin', 'staff'])->get();
-        
+
         foreach ($admins as $admin) {
             Notification::createForUser(
                 $admin->_id,
@@ -256,7 +290,7 @@ class NotificationService
     public static function notifyProductExpiring($product, $batch)
     {
         $admins = User::whereIn('role', ['admin', 'staff'])->get();
-        
+
         foreach ($admins as $admin) {
             Notification::createForUser(
                 $admin->_id,
