@@ -15,7 +15,10 @@ use App\Http\Controllers\Api\POSController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-// Root redirect
+// ============================================================================
+// ROOT REDIRECT
+// ============================================================================
+
 Route::get('/', function () {
     if (auth()->check()) {
         $user = auth()->user();
@@ -44,16 +47,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Page routes
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
-        Route::get('/products/create', function () {
-            return Inertia::render('Admin/Products/Create');
-        })->name('products.create');
-
         Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers');
-
-        Route::get('/products', function () {
-            return Inertia::render('Admin/Products/Index');
-        })->name('products');
+        Route::get('/products', fn() => Inertia::render('Admin/Products/Index'))->name('products');
+        Route::get('/products/create', fn() => Inertia::render('Admin/Products/Create'))->name('products.create');
 
         Route::get('/products/{id}/edit', function ($id) {
             $product = \App\Models\Product::findOrFail($id);
@@ -95,56 +91,26 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ]);
         })->name('products.batches');
 
-        // Orders page
-        Route::get('/orders', function () {
-            return Inertia::render('Admin/Orders/Index');
-        })->name('orders');
-
+        Route::get('/orders', fn() => Inertia::render('Admin/Orders/Index'))->name('orders');
         Route::get('/orders/{id}', function ($id) {
             try {
                 $order = \App\Models\Order::with(['customer', 'prescription'])
                     ->where('_id', $id)
                     ->firstOrFail();
 
-                return Inertia::render('Admin/Orders/Detail', [
-                    'order' => $order
-                ]);
+                return Inertia::render('Admin/Orders/Detail', ['order' => $order]);
             } catch (\Exception $e) {
-                return redirect()->route('admin.orders')
-                    ->with('error', 'Order not found');
+                return redirect()->route('admin.orders')->with('error', 'Order not found');
             }
         })->name('orders.detail');
 
-        // POS page
-        Route::get('/pos', function () {
-            return Inertia::render('Admin/POS/Index');
-        })->name('pos');
-
-        // Prescriptions page (now handles orders too)
-        Route::get('/prescriptions', function () {
-            return Inertia::render('Admin/Prescriptions/Index');
-        })->name('prescriptions');
-
-        Route::get('/prescriptions/{id}', function ($id) {
-            return Inertia::render('Admin/Prescriptions/Detail');
-        })->name('prescriptions.detail');
-
-        // Notifications page
-        Route::get('/notifications', function () {
-            return Inertia::render('Admin/Notifications/Index');
-        })->name('notifications');
-
-        Route::get('/customers', function () {
-            return Inertia::render('Admin/Customers/Index');
-        })->name('customers');
-
-        Route::get('/conversations', function () {
-            return Inertia::render('Admin/Conversations/Index');
-        })->name('conversations');
-
-        Route::get('/reports', function () {
-            return Inertia::render('Admin/Reports/Index');
-        })->name('reports');
+        Route::get('/pos', fn() => Inertia::render('Admin/POS/Index'))->name('pos');
+        Route::get('/prescriptions', fn() => Inertia::render('Admin/Prescriptions/Index'))->name('prescriptions');
+        Route::get('/prescriptions/{id}', fn($id) => Inertia::render('Admin/Prescriptions/Detail'))->name('prescriptions.detail');
+        Route::get('/notifications', fn() => Inertia::render('Admin/Notifications/Index'))->name('notifications');
+        Route::get('/customers', fn() => Inertia::render('Admin/Customers/Index'))->name('customers');
+        Route::get('/conversations', fn() => Inertia::render('Admin/Conversations/Index'))->name('conversations');
+        Route::get('/reports', fn() => Inertia::render('Admin/Reports/Index'))->name('reports');
 
         Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
 
@@ -157,13 +123,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
             // Categories
             Route::get('/categories', function () {
-                return response()->json([
-                    'success' => true,
-                    'categories' => []
-                ]);
+                return response()->json(['success' => true, 'categories' => []]);
             })->name('categories.index');
 
-            // Suppliers API routes
+            // Suppliers
             Route::get('/suppliers', [SupplierController::class, 'apiIndex'])->name('suppliers.index');
             Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
             Route::put('/suppliers/{id}', [SupplierController::class, 'update'])->name('suppliers.update');
@@ -178,11 +141,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/products/{id}/batches', [ProductController::class, 'getBatches'])->name('products.batches.api');
             Route::get('/products/{id}/stock-movements', [ProductController::class, 'getStockMovements'])->name('products.stock-movements');
 
-            // Orders API
+            // Orders
             Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
             Route::get('/orders/{id}', [OrderController::class, 'show'])->name('orders.show');
+            Route::post('/orders/{id}/mark-ready', [OrderController::class, 'markReadyForPickup'])->name('orders.mark-ready');
+            Route::post('/orders/{id}/complete-pickup', [OrderController::class, 'completePickup'])->name('orders.complete-pickup');
+            Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
 
-            // POS API routes
+            // POS
             Route::prefix('pos')->name('pos.')->group(function () {
                 Route::get('/products/search', [POSController::class, 'searchProducts'])->name('products.search');
                 Route::get('/products/{id}', [POSController::class, 'getProduct'])->name('products.show');
@@ -190,19 +156,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::get('/transactions', [POSController::class, 'getTransactions'])->name('transactions');
             });
 
-            // Prescriptions (now includes order management)
+            // Prescriptions
             Route::get('/prescriptions', [PrescriptionController::class, 'index'])->name('prescriptions.index');
             Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show'])->name('prescriptions.show');
             Route::post('/prescriptions/{id}/verify', [PrescriptionController::class, 'verify'])->name('prescriptions.verify');
             Route::post('/prescriptions/{id}/reject', [PrescriptionController::class, 'reject'])->name('prescriptions.reject');
             Route::get('/prescriptions/{id}/download', [PrescriptionController::class, 'download'])->name('prescriptions.download');
-
-            // Admin order management
-            Route::post('/orders/{id}/mark-ready', [OrderController::class, 'markReadyForPickup'])->name('orders.mark-ready');
-            Route::post('/orders/{id}/complete-pickup', [OrderController::class, 'completePickup'])->name('orders.complete-pickup');
-            Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
-
-            // Order management through prescriptions
             Route::post('/prescriptions/{id}/complete-order', [PrescriptionController::class, 'completeOrder'])->name('prescriptions.complete-order');
             Route::post('/prescriptions/{id}/cancel-order', [PrescriptionController::class, 'cancelOrder'])->name('prescriptions.cancel-order');
             Route::post('/prescriptions/{id}/update-order-status', [PrescriptionController::class, 'updateOrderStatus'])->name('prescriptions.update-order-status');
@@ -235,17 +194,17 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
             Route::post('/notifications/delete-multiple', [NotificationController::class, 'destroyMultiple'])->name('notifications.delete-multiple');
             Route::delete('/notifications/delete-all-read', [NotificationController::class, 'deleteAllRead'])->name('notifications.delete-all-read');
-        });
 
-        // In routes/web.php or routes/api.php
-        Route::middleware(['auth', 'admin'])->prefix('admin/api')->group(function () {
-            Route::get('/reports/dashboard', [ReportController::class, 'dashboard']);
-            Route::get('/reports/sales', [ReportController::class, 'sales']);
-            Route::get('/reports/inventory', [ReportController::class, 'inventory']);
-            Route::get('/reports/top-products', [ReportController::class, 'topProducts']);
-            Route::get('/reports/expiring-products', [ReportController::class, 'expiringProducts']);
-            Route::get('/reports/prescriptions', [ReportController::class, 'prescriptions']);
-            Route::get('/reports/customers', [ReportController::class, 'customers']);
+            // Reports
+            Route::prefix('reports')->name('reports.')->group(function () {
+                Route::get('/dashboard', [ReportController::class, 'dashboard'])->name('dashboard');
+                Route::get('/sales', [ReportController::class, 'sales'])->name('sales');
+                Route::get('/inventory', [ReportController::class, 'inventory'])->name('inventory');
+                Route::get('/top-products', [ReportController::class, 'topProducts'])->name('top-products');
+                Route::get('/expiring-products', [ReportController::class, 'expiringProducts'])->name('expiring-products');
+                Route::get('/prescriptions', [ReportController::class, 'prescriptions'])->name('prescriptions');
+                Route::get('/customers', [ReportController::class, 'customers'])->name('customers');
+            });
         });
     });
 });
@@ -256,13 +215,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
 Route::prefix('customer')->name('customer.')->group(function () {
 
-    Route::get('/signup/step-1', [CustomerAuthController::class, 'showRegistrationStep1'])->name('signup.step_one');
-    Route::post('/signup/step-1', [CustomerAuthController::class, 'handleRegistrationStep1'])->name('signup.step_one.post');
-    Route::get('/signup/step-2', [CustomerAuthController::class, 'showRegistrationStep2'])->name('signup.step_two');
-    Route::post('/signup/step-2', [CustomerAuthController::class, 'handleRegistrationStep2'])->name('signup.step_two.post');
-
-    Route::get('/login', [CustomerAuthController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [CustomerAuthController::class, 'login'])->name('login.post');
+    // Guest routes
+    Route::middleware('guest')->group(function () {
+        Route::get('/signup/step-1', [CustomerAuthController::class, 'showRegistrationStep1'])->name('signup.step_one');
+        Route::post('/signup/step-1', [CustomerAuthController::class, 'handleRegistrationStep1'])->name('signup.step_one.post');
+        Route::get('/signup/step-2', [CustomerAuthController::class, 'showRegistrationStep2'])->name('signup.step_two');
+        Route::post('/signup/step-2', [CustomerAuthController::class, 'handleRegistrationStep2'])->name('signup.step_two.post');
+        Route::get('/login', [CustomerAuthController::class, 'showLoginForm'])->name('login');
+        Route::post('/login', [CustomerAuthController::class, 'login'])->name('login.post');
+    });
 
     // Authenticated routes
     Route::middleware('auth')->group(function () {
@@ -272,11 +233,9 @@ Route::prefix('customer')->name('customer.')->group(function () {
         Route::get('/profile', [CustomerAuthController::class, 'profile'])->name('profile');
         Route::put('/profile', [CustomerAuthController::class, 'updateProfile'])->name('profile.update');
         Route::post('/profile/change-password', [CustomerAuthController::class, 'changePassword'])->name('profile.change-password');
-
-        // Products page
-        Route::get('/products', function () {
-            return Inertia::render('Customer/Products/Index');
-        })->name('products');
+        Route::get('/products', fn() => Inertia::render('Customer/Products/Index'))->name('products');
+        Route::get('/checkout', fn() => Inertia::render('Customer/Checkout'))->name('checkout');
+        Route::get('/orders', fn() => Inertia::render('Customer/Orders/Index'))->name('orders');
 
         Route::get('/orders/{id}', function ($id) {
             try {
@@ -284,29 +243,13 @@ Route::prefix('customer')->name('customer.')->group(function () {
                     ->where('customer_id', auth()->id())
                     ->firstOrFail();
 
-                return Inertia::render('Customer/Orders/Detail', [
-                    'order' => $order
-                ]);
+                return Inertia::render('Customer/Orders/Detail', ['order' => $order]);
             } catch (\Exception $e) {
-                return redirect()->route('customer.orders')
-                    ->with('error', 'Order not found');
+                return redirect()->route('customer.orders')->with('error', 'Order not found');
             }
         })->name('orders.detail');
 
-        // Checkout page
-        Route::get('/checkout', function () {
-            return Inertia::render('Customer/Checkout');
-        })->name('checkout');
-
-        // Orders page
-        Route::get('/orders', function () {
-            return Inertia::render('Customer/Orders/Index');
-        })->name('orders');
-
-        // Prescriptions/Orders page
-        Route::get('/prescriptions', function () {
-            return Inertia::render('Customer/Prescriptions/Index');
-        })->name('prescriptions');
+        Route::get('/prescriptions', fn() => Inertia::render('Customer/Prescriptions/Index'))->name('prescriptions');
 
         Route::get('/prescriptions/{id}', function ($id) {
             try {
@@ -315,29 +258,15 @@ Route::prefix('customer')->name('customer.')->group(function () {
                     ->where('customer_id', auth()->id())
                     ->firstOrFail();
 
-                return Inertia::render('Customer/Prescriptions/Detail', [
-                    'prescription' => $prescription
-                ]);
+                return Inertia::render('Customer/Prescriptions/Detail', ['prescription' => $prescription]);
             } catch (\Exception $e) {
-                return redirect()->route('customer.prescriptions')
-                    ->with('error', 'Prescription not found');
+                return redirect()->route('customer.prescriptions')->with('error', 'Prescription not found');
             }
         })->name('prescriptions.detail');
 
-
-        Route::get('/conversations', function () {
-            return Inertia::render('Customer/Conversations/Index');
-        })->name('conversations');
-
-        Route::get('/conversations/{id}', function ($id) {
-            return Inertia::render('Customer/Conversations/Detail');
-        })->name('conversations.detail');
-
-
-        // Notifications page
-        Route::get('/notifications', function () {
-            return Inertia::render('Customer/Notifications/Index');
-        })->name('notifications');
+        Route::get('/conversations', fn() => Inertia::render('Customer/Conversations/Index'))->name('conversations');
+        Route::get('/conversations/{id}', fn($id) => Inertia::render('Customer/Conversations/Detail'))->name('conversations.detail');
+        Route::get('/notifications', fn() => Inertia::render('Customer/Notifications/Index'))->name('notifications');
 
         Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('logout');
 
@@ -349,10 +278,11 @@ Route::prefix('customer')->name('customer.')->group(function () {
             Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
             Route::get('/products/search/{query}', [ProductController::class, 'search'])->name('products.search');
 
+            // Orders
             Route::get('/orders', [OrderController::class, 'customerOrders'])->name('orders.index');
             Route::post('/orders/create', [OrderController::class, 'create'])->name('orders.create');
 
-            // Prescriptions (now includes order management for customer)
+            // Prescriptions
             Route::get('/prescriptions', [PrescriptionController::class, 'customerPrescriptions'])->name('prescriptions.index');
             Route::post('/prescriptions', [PrescriptionController::class, 'store'])->name('prescriptions.store');
             Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show'])->name('prescriptions.show');
@@ -378,7 +308,10 @@ Route::prefix('customer')->name('customer.')->group(function () {
     });
 });
 
-// Fallback route
+// ============================================================================
+// FALLBACK ROUTE
+// ============================================================================
+
 Route::fallback(function () {
     if (auth()->check()) {
         $user = auth()->user();

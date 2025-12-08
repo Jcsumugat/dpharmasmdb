@@ -59,7 +59,7 @@ export default function Dashboard({ stats }) {
                         </div>
                     </div>
 
-                    {/* Overview Stats */}
+                    {/* Overview Stats - WITH PROFIT */}
                     <div className="mb-10">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <MetricCard
@@ -70,6 +70,14 @@ export default function Dashboard({ stats }) {
                                 value={formatCurrency(stats.overview.total_revenue.value)}
                                 change={stats.overview.total_revenue.change}
                                 changeLabel="vs previous period"
+                            />
+                            <MetricCard
+                                icon="💵"
+                                iconBg="bg-green-100"
+                                iconColor="text-green-500"
+                                label="Total Profit"
+                                value={formatCurrency(stats.profit?.total || 0)}
+                                subtitle={stats.profit?.profit_margin ? `${stats.profit.profit_margin.toFixed(1)}% margin` : null}
                             />
                             <MetricCard
                                 icon="🛒"
@@ -87,45 +95,40 @@ export default function Dashboard({ stats }) {
                                 label="Total Customers"
                                 value={stats.overview.total_customers}
                             />
-                            <MetricCard
-                                icon="📝"
-                                iconBg="bg-amber-100"
-                                iconColor="text-amber-500"
-                                label="Pending Prescriptions"
-                                value={stats.overview.pending_prescriptions}
-                                highlight={stats.overview.pending_prescriptions > 0}
-                            />
                         </div>
                     </div>
 
-                    {/* Revenue Breakdown */}
+                    {/* Revenue & Profit Breakdown */}
                     <div className="mb-10">
                         <div className="mb-6">
                             <h2 className="text-xl font-bold text-gray-900 mb-1 tracking-tight">
-                                Revenue Breakdown
+                                Revenue & Profit Breakdown
                             </h2>
                             <p className="text-sm text-gray-600">
-                                Sales performance across channels
+                                Sales and profit performance across channels
                             </p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <RevenueCard
                                 label="Online Sales"
-                                value={formatCurrency(stats.revenue.online)}
+                                revenue={formatCurrency(stats.revenue.online)}
+                                profit={stats.profit ? formatCurrency(stats.profit.orders) : '₱0.00'}
                                 icon="🌐"
                                 gradientFrom="from-sky-500"
                                 gradientTo="to-sky-600"
                             />
                             <RevenueCard
                                 label="POS Sales"
-                                value={formatCurrency(stats.revenue.pos)}
+                                revenue={formatCurrency(stats.revenue.pos)}
+                                profit={stats.profit ? formatCurrency(stats.profit.pos) : '₱0.00'}
                                 icon="🏪"
                                 gradientFrom="from-violet-500"
                                 gradientTo="to-violet-600"
                             />
                             <RevenueCard
                                 label="Total Revenue"
-                                value={formatCurrency(stats.revenue.total)}
+                                revenue={formatCurrency(stats.revenue.total)}
+                                profit={stats.profit ? formatCurrency(stats.profit.total) : '₱0.00'}
                                 icon="💵"
                                 gradientFrom="from-emerald-500"
                                 gradientTo="to-emerald-600"
@@ -134,7 +137,7 @@ export default function Dashboard({ stats }) {
                         </div>
                     </div>
 
-                    {/* Orders & Products */}
+                    {/* Orders & Products with Warning Badges */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
                         {/* Order Stats */}
                         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden">
@@ -147,7 +150,13 @@ export default function Dashboard({ stats }) {
                                 </span>
                             </div>
                             <div className="px-7 py-6 flex flex-col gap-4">
-                                <StatusItem label="Pending" value={stats.orders.pending} color="bg-amber-500" textColor="text-amber-500" />
+                                <StatusItem
+                                    label="Pending"
+                                    value={stats.orders.pending}
+                                    color="bg-amber-500"
+                                    textColor="text-amber-500"
+                                    badge={stats.orders.pending > 0}
+                                />
                                 <StatusItem label="Processing" value={stats.orders.processing} color="bg-sky-500" textColor="text-sky-500" />
                                 <StatusItem label="Shipped" value={stats.orders.shipped} color="bg-violet-500" textColor="text-violet-500" />
                                 <StatusItem label="Delivered" value={stats.orders.delivered} color="bg-emerald-500" textColor="text-emerald-500" />
@@ -155,7 +164,7 @@ export default function Dashboard({ stats }) {
                             </div>
                         </div>
 
-                        {/* Product Stats */}
+                        {/* Product Stats with Warning Badges */}
                         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden">
                             <div className="px-7 py-6 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
                                 <h3 className="text-base font-bold text-gray-900 tracking-tight">
@@ -166,10 +175,36 @@ export default function Dashboard({ stats }) {
                                 </span>
                             </div>
                             <div className="px-7 py-6 flex flex-col gap-4">
-                                <StatusItem label="Total Products" value={stats.products.total} color="bg-sky-500" textColor="text-sky-500" />
-                                <StatusItem label="Low Stock" value={stats.products.low_stock} color="bg-amber-500" textColor="text-amber-500" alert={stats.products.low_of_stock > 0} />
-                                <StatusItem label="Out of Stock" value={stats.products.out_of_stock} color="bg-red-500" textColor="text-red-500" alert={stats.products.out_of_stock > 0} />
-                                <StatusItem label="Expiring Soon" value={stats.products.expiring_soon} color="bg-amber-500" textColor="text-amber-500" alert={stats.products.expiring_soon > 0} />
+                                <StatusItem
+                                    label="Total Products"
+                                    value={stats.products.total}
+                                    color="bg-sky-500"
+                                    textColor="text-sky-500"
+                                />
+                                <StatusItem
+                                    label="Low Stock"
+                                    value={stats.products.low_stock}
+                                    color="bg-amber-500"
+                                    textColor="text-amber-500"
+                                    badge={stats.products.low_stock > 0}
+                                    badgeColor="bg-amber-100 text-amber-800"
+                                />
+                                <StatusItem
+                                    label="Out of Stock"
+                                    value={stats.products.out_of_stock}
+                                    color="bg-red-500"
+                                    textColor="text-red-500"
+                                    badge={stats.products.out_of_stock > 0}
+                                    badgeColor="bg-red-100 text-red-800"
+                                />
+                                <StatusItem
+                                    label="Expiring Soon"
+                                    value={stats.products.expiring_soon}
+                                    color="bg-orange-500"
+                                    textColor="text-orange-500"
+                                    badge={stats.products.expiring_soon > 0}
+                                    badgeColor="bg-orange-100 text-orange-800"
+                                />
                             </div>
                         </div>
                     </div>
@@ -204,7 +239,13 @@ export default function Dashboard({ stats }) {
                                 </span>
                             </div>
                             <div className="px-7 py-6 flex flex-col gap-4">
-                                <StatusItem label="Pending Review" value={stats.prescriptions.pending} color="bg-amber-500" textColor="text-amber-500" alert={stats.prescriptions.pending > 0} />
+                                <StatusItem
+                                    label="Pending Review"
+                                    value={stats.prescriptions.pending}
+                                    color="bg-amber-500"
+                                    textColor="text-amber-500"
+                                    badge={stats.prescriptions.pending > 0}
+                                />
                                 <StatusItem label="Verified" value={stats.prescriptions.verified} color="bg-emerald-500" textColor="text-emerald-500" />
                                 <StatusItem label="Rejected" value={stats.prescriptions.rejected} color="bg-red-500" textColor="text-red-500" />
                             </div>
@@ -216,7 +257,7 @@ export default function Dashboard({ stats }) {
     );
 }
 
-function MetricCard({ icon, iconBg, iconColor, label, value, change, changeLabel, highlight }) {
+function MetricCard({ icon, iconBg, iconColor, label, value, change, changeLabel, subtitle, highlight }) {
     const formatPercentage = (val) => {
         const num = Number(val || 0);
         const sign = num > 0 ? '+' : '';
@@ -244,6 +285,11 @@ function MetricCard({ icon, iconBg, iconColor, label, value, change, changeLabel
                 <h3 className="text-3xl font-bold text-gray-900 mb-3 tracking-tight">
                     {value}
                 </h3>
+                {subtitle && (
+                    <p className="text-xs text-gray-500 font-medium">
+                        {subtitle}
+                    </p>
+                )}
                 {change !== undefined && changeColors && (
                     <div className="flex items-center gap-2 flex-wrap">
                         <span className={`${changeColors.bg} ${changeColors.text} px-2.5 py-1 rounded-md text-xs font-bold`}>
@@ -261,7 +307,7 @@ function MetricCard({ icon, iconBg, iconColor, label, value, change, changeLabel
     );
 }
 
-function RevenueCard({ label, value, icon, gradientFrom, gradientTo, featured }) {
+function RevenueCard({ label, revenue, profit, icon, gradientFrom, gradientTo, featured }) {
     return (
         <div className={`bg-gradient-to-br ${gradientFrom} ${gradientTo} p-8 rounded-2xl text-white relative overflow-hidden transition-all duration-300 ${featured ? 'shadow-2xl shadow-emerald-500/40' : 'shadow-xl shadow-black/20'} hover:-translate-y-1 hover:shadow-2xl`}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full translate-x-10 -translate-y-10"></div>
@@ -272,24 +318,35 @@ function RevenueCard({ label, value, icon, gradientFrom, gradientTo, featured })
                 <p className="text-sm mb-3 opacity-90 font-semibold uppercase tracking-wider">
                     {label}
                 </p>
-                <h3 className="text-4xl font-bold tracking-tight">
-                    {value}
+                <h3 className="text-3xl font-bold tracking-tight mb-2">
+                    {revenue}
                 </h3>
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/20">
+                    <span className="text-xs opacity-75">Profit:</span>
+                    <span className="text-lg font-bold">{profit}</span>
+                </div>
             </div>
         </div>
     );
 }
 
-function StatusItem({ label, value, color, textColor, alert }) {
+function StatusItem({ label, value, color, textColor, badge, badgeColor = "bg-amber-100 text-amber-800" }) {
     return (
-        <div className={`flex items-center gap-4 px-4 py-3.5 rounded-xl ${alert ? 'bg-red-50 border border-red-200' : 'bg-gray-50'} transition-all duration-200 hover:bg-gray-100 hover:translate-x-1`}>
+        <div className={`flex items-center gap-4 px-4 py-3.5 rounded-xl ${badge ? 'bg-red-50 border border-red-200' : 'bg-gray-50'} transition-all duration-200 hover:bg-gray-100 hover:translate-x-1`}>
             <div className={`w-2.5 h-2.5 ${color} rounded-full flex-shrink-0 shadow-sm`}></div>
             <span className="flex-1 text-gray-700 text-sm font-medium">
                 {label}
             </span>
-            <span className={`${textColor} font-bold text-lg tracking-tight`}>
-                {value}
-            </span>
+            <div className="flex items-center gap-2">
+                <span className={`${textColor} font-bold text-lg tracking-tight`}>
+                    {value}
+                </span>
+                {badge && value > 0 && (
+                    <span className={`${badgeColor} px-2 py-1 rounded-full text-xs font-bold animate-pulse`}>
+                        !
+                    </span>
+                )}
+            </div>
         </div>
     );
 }

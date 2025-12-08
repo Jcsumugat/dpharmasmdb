@@ -83,7 +83,13 @@ class OrderController extends Controller
                     throw new \Exception("Insufficient stock for {$product->product_name}. Available: {$product->getAvailableStock()}");
                 }
 
-                $itemTotal = $product->getCurrentPrice() * $item['quantity'];
+                // FIX: Get unit_cost from first available batch (FIFO)
+                $availableBatches = $product->getAvailableBatches();
+                $firstBatch = $availableBatches->first();
+                $unitCost = $firstBatch ? (float) $firstBatch['unit_cost'] : 0;
+                $currentPrice = $product->getCurrentPrice();
+
+                $itemTotal = $currentPrice * $item['quantity'];
                 $subtotal += $itemTotal;
 
                 $orderItems[] = [
@@ -91,7 +97,8 @@ class OrderController extends Controller
                     'product_name' => $product->product_name,
                     'brand_name' => $product->brand_name ?? '',
                     'quantity' => $item['quantity'],
-                    'unit_price' => $product->getCurrentPrice(),
+                    'unit_price' => $currentPrice,
+                    'unit_cost' => $unitCost, 
                     'subtotal' => $itemTotal,
                     'available' => true
                 ];
@@ -242,7 +249,7 @@ class OrderController extends Controller
             ], 404);
         }
     }
-    
+
     /**
      * Handle prescription file upload
      */

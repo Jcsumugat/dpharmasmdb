@@ -13,9 +13,7 @@ export default function ReportsIndex() {
     const [expiringProducts, setExpiringProducts] = useState([]);
     const [prescriptionStats, setPrescriptionStats] = useState(null);
 
-    // Set default dates to today
     const today = new Date().toISOString().split('T')[0];
-    const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
     const [filters, setFilters] = useState({
         period: 'today',
@@ -25,7 +23,6 @@ export default function ReportsIndex() {
         expiring_days: 30
     });
 
-    // Get date range based on period
     const getDateRange = (period) => {
         const now = new Date();
         let start, end;
@@ -73,7 +70,6 @@ export default function ReportsIndex() {
         }
     }, [activeTab]);
 
-    // Auto-fetch when period changes (except for custom)
     useEffect(() => {
         if (filters.period !== 'custom') {
             if (activeTab === 'dashboard') {
@@ -88,14 +84,12 @@ export default function ReportsIndex() {
         }
     }, [filters.period]);
 
-    // Auto-fetch inventory when type changes
     useEffect(() => {
         if (activeTab === 'inventory') {
             fetchInventoryReport();
         }
     }, [filters.inventory_type]);
 
-    // Auto-fetch expiring when days changes
     useEffect(() => {
         if (activeTab === 'expiring') {
             fetchExpiringProducts();
@@ -262,8 +256,8 @@ export default function ReportsIndex() {
                         key={period}
                         onClick={() => handlePeriodChange(period)}
                         className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.period === period
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                     >
                         {period === 'today' ? 'Today' :
@@ -315,14 +309,12 @@ export default function ReportsIndex() {
                     <p className="text-gray-600">Comprehensive business insights and statistics</p>
                 </div>
 
-                {/* Error Message */}
                 {error && (
                     <div className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4">
                         <p className="text-red-800 font-medium">{error}</p>
                     </div>
                 )}
 
-                {/* Tabs */}
                 <div className="bg-white rounded-2xl border border-gray-200 mb-6 shadow-sm overflow-x-auto">
                     <div className="flex border-b border-gray-200">
                         {['dashboard', 'sales', 'inventory', 'top-products', 'expiring', 'prescriptions'].map(tab => (
@@ -333,8 +325,8 @@ export default function ReportsIndex() {
                                     setError(null);
                                 }}
                                 className={`px-6 py-4 font-semibold transition-colors whitespace-nowrap ${activeTab === tab
-                                        ? 'border-b-2 border-indigo-600 text-indigo-600'
-                                        : 'text-gray-600 hover:text-gray-900'
+                                    ? 'border-b-2 border-indigo-600 text-indigo-600'
+                                    : 'text-gray-600 hover:text-gray-900'
                                     }`}
                             >
                                 {tab.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
@@ -354,21 +346,32 @@ export default function ReportsIndex() {
                             </div>
                         ) : dashboardStats && (
                             <>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                     <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
                                         <p className="text-sm font-medium text-gray-600 mb-2">Total Revenue</p>
                                         <p className="text-3xl font-bold text-indigo-600">{formatCurrency(dashboardStats.revenue?.total)}</p>
                                     </div>
                                     <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                                        <p className="text-sm font-medium text-gray-600 mb-2">POS Revenue</p>
-                                        <p className="text-3xl font-bold text-green-600">{formatCurrency(dashboardStats.revenue?.pos)}</p>
+                                        <p className="text-sm font-medium text-gray-600 mb-2">Total Profit</p>
+                                        <p className="text-3xl font-bold text-green-600">{formatCurrency(dashboardStats.profit?.total)}</p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {dashboardStats.profit?.profit_margin?.toFixed(1)}% margin
+                                        </p>
                                     </div>
                                     <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                                        <p className="text-sm font-medium text-gray-600 mb-2">Orders Revenue</p>
-                                        <p className="text-3xl font-bold text-blue-600">{formatCurrency(dashboardStats.revenue?.orders)}</p>
+                                        <p className="text-sm font-medium text-gray-600 mb-2">Total Cost</p>
+                                        <p className="text-3xl font-bold text-orange-600">{formatCurrency(dashboardStats.profit?.total_cost)}</p>
+                                    </div>
+                                    <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                                        <p className="text-sm font-medium text-gray-600 mb-2">POS vs Orders</p>
+                                        <div className="space-y-1">
+                                            <p className="text-sm">POS: <span className="font-bold text-green-600">{formatCurrency(dashboardStats.profit?.pos)}</span></p>
+                                            <p className="text-sm">Orders: <span className="font-bold text-blue-600">{formatCurrency(dashboardStats.profit?.orders)}</span></p>
+                                        </div>
                                     </div>
                                 </div>
 
+                                {/* Rest of dashboard content... */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
                                         <h3 className="text-lg font-bold text-gray-900 mb-4">Orders</h3>
@@ -437,7 +440,7 @@ export default function ReportsIndex() {
                     </div>
                 )}
 
-                {/* Sales Report Tab */}
+                {/* Sales Report Tab - UPDATED WITH PROFIT */}
                 {activeTab === 'sales' && (
                     <div className="space-y-6">
                         {renderPeriodFilter()}
@@ -448,18 +451,28 @@ export default function ReportsIndex() {
                             </div>
                         ) : salesReport ? (
                             <>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                     <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
                                         <p className="text-sm font-medium text-gray-600 mb-2">Total Revenue</p>
                                         <p className="text-3xl font-bold text-indigo-600">{formatCurrency(salesReport.total_revenue)}</p>
                                     </div>
                                     <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                                        <p className="text-sm font-medium text-gray-600 mb-2">Total Transactions</p>
-                                        <p className="text-3xl font-bold text-gray-900">{salesReport.total_transactions}</p>
+                                        <p className="text-sm font-medium text-gray-600 mb-2">Total Profit</p>
+                                        <p className="text-3xl font-bold text-green-600">{formatCurrency(salesReport.total_profit)}</p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {salesReport.profit_margin?.toFixed(1)}% margin
+                                        </p>
                                     </div>
                                     <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                                        <p className="text-sm font-medium text-gray-600 mb-2">Average Transaction</p>
-                                        <p className="text-3xl font-bold text-gray-900">{formatCurrency(salesReport.average_transaction)}</p>
+                                        <p className="text-sm font-medium text-gray-600 mb-2">Total Cost</p>
+                                        <p className="text-3xl font-bold text-orange-600">{formatCurrency(salesReport.total_cost)}</p>
+                                    </div>
+                                    <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                                        <p className="text-sm font-medium text-gray-600 mb-2">Total Transactions</p>
+                                        <p className="text-3xl font-bold text-gray-900">{salesReport.total_transactions}</p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Avg: {formatCurrency(salesReport.average_transaction)}
+                                        </p>
                                     </div>
                                 </div>
 
@@ -485,18 +498,71 @@ export default function ReportsIndex() {
                                     </div>
 
                                     <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                                        <h3 className="text-lg font-bold text-gray-900 mb-4">Sales by Date</h3>
-                                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                                            {Object.entries(salesReport.sales_by_date || {}).map(([date, data]) => (
-                                                <div key={date} className="flex justify-between items-center py-2 border-b border-gray-100">
-                                                    <span className="text-sm text-gray-600">{date}</span>
+                                        <h3 className="text-lg font-bold text-gray-900 mb-4">Profit by Source</h3>
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-600">POS Profit</span>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-green-600">{formatCurrency(salesReport.pos_profit)}</p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {salesReport.pos_revenue > 0 ? ((salesReport.pos_profit / salesReport.pos_revenue) * 100).toFixed(1) : 0}% margin
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-600">Orders Profit</span>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-blue-600">{formatCurrency(salesReport.orders_profit)}</p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {salesReport.orders_revenue > 0 ? ((salesReport.orders_profit / salesReport.orders_revenue) * 100).toFixed(1) : 0}% margin
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-lg font-bold text-gray-900">Sales & Profit by Date</h3>
+                                        <div className="text-right">
+                                            <p className="text-sm text-gray-600">Total Days: {Object.keys(salesReport.sales_by_date || {}).length}</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                                        {Object.entries(salesReport.sales_by_date || {}).map(([date, data]) => (
+                                            <div key={date} className="p-3 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-colors">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className="text-sm font-semibold text-gray-700">{date}</span>
                                                     <div className="text-right">
-                                                        <p className="font-semibold text-gray-900">{formatCurrency(data.total)}</p>
-                                                        <p className="text-xs text-gray-500">{data.count} transactions</p>
+                                                        <p className="font-bold text-lg text-gray-900">{formatCurrency(data.total)}</p>
+                                                        <p className="text-xs text-gray-500">{data.count} transaction{data.count !== 1 ? 's' : ''}</p>
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
+                                                {data.profit !== undefined && (
+                                                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-200">
+                                                        <div>
+                                                            <p className="text-xs text-gray-500">Profit</p>
+                                                            <p className="text-sm font-bold text-green-600">
+                                                                {formatCurrency(data.profit)}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs text-gray-500">Cost</p>
+                                                            <p className="text-sm font-semibold text-orange-600">
+                                                                {formatCurrency(data.cost)}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs text-gray-500">Margin</p>
+                                                            <p className="text-sm font-bold text-indigo-600">
+                                                                {data.profit_margin?.toFixed(1)}%
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </>
@@ -519,8 +585,8 @@ export default function ReportsIndex() {
                                         key={type}
                                         onClick={() => setFilters(prev => ({ ...prev, inventory_type: type }))}
                                         className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.inventory_type === type
-                                                ? 'bg-indigo-600 text-white'
-                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            ? 'bg-indigo-600 text-white'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                             }`}
                                     >
                                         {type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
@@ -710,8 +776,8 @@ export default function ReportsIndex() {
                                                                 const daysLeft = Math.ceil((new Date(batch.expiration_date) - new Date()) / (1000 * 60 * 60 * 24));
                                                                 return (
                                                                     <span className={`px-3 py-1 text-xs font-semibold rounded-full ${daysLeft <= 7 ? 'bg-red-100 text-red-800' :
-                                                                            daysLeft <= 14 ? 'bg-orange-100 text-orange-800' :
-                                                                                'bg-yellow-100 text-yellow-800'
+                                                                        daysLeft <= 14 ? 'bg-orange-100 text-orange-800' :
+                                                                            'bg-yellow-100 text-yellow-800'
                                                                         }`}>
                                                                         {daysLeft} days
                                                                     </span>

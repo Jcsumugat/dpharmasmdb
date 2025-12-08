@@ -24,9 +24,9 @@ class POSController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('product_name', 'like', "%{$search}%")
-                  ->orWhere('product_code', 'like', "%{$search}%")
-                  ->orWhere('brand_name', 'like', "%{$search}%")
-                  ->orWhere('generic_name', 'like', "%{$search}%");
+                    ->orWhere('product_code', 'like', "%{$search}%")
+                    ->orWhere('brand_name', 'like', "%{$search}%")
+                    ->orWhere('generic_name', 'like', "%{$search}%");
             });
         }
 
@@ -140,7 +140,6 @@ class POSController extends Controller
             $subtotal = 0;
             $processedItems = [];
 
-            // Validate and calculate
             foreach ($validated['items'] as $item) {
                 $product = Product::findOrFail($item['product_id']);
 
@@ -155,7 +154,11 @@ class POSController extends Controller
                 $total = $price * $item['quantity'];
                 $subtotal += $total;
 
-                // FIX: Use id property or cast _id to string
+                // 🔥 ADD THIS: Get unit_cost from first available batch (FIFO)
+                $availableBatches = $product->getAvailableBatches();
+                $firstBatch = $availableBatches->first();
+                $unitCost = $firstBatch ? (float) $firstBatch['unit_cost'] : 0;
+
                 $productId = $product->id ?? (string) $product->_id;
 
                 $processedItems[] = [
@@ -164,12 +167,13 @@ class POSController extends Controller
                     'brand_name' => $product->brand_name,
                     'quantity' => $item['quantity'],
                     'unit_price' => $price,
+                    'unit_cost' => $unitCost,
                     'total_price' => $total,
                 ];
             }
 
             $discountAmount = $validated['discount_amount'] ?? 0;
-            $taxAmount = 0; // Add tax calculation if needed
+            $taxAmount = 0;
             $totalAmount = $subtotal + $taxAmount - $discountAmount;
             $changeAmount = $validated['amount_paid'] - $totalAmount;
 
@@ -198,15 +202,12 @@ class POSController extends Controller
                 'processed_by' => auth()->id(),
             ]);
 
-            // Get transaction ID
             $transactionId = $transaction->id ?? (string) $transaction->_id;
 
             // Reduce stock for each item
             foreach ($validated['items'] as $item) {
                 try {
                     $product = Product::findOrFail($item['product_id']);
-
-                    // Get product ID
                     $productId = $product->id ?? (string) $product->_id;
 
                     \Log::info('Processing product for stock reduction', [
@@ -218,7 +219,7 @@ class POSController extends Controller
                     // Reduce stock using FIFO
                     $product->reduceStock($item['quantity'], 'pos_sale');
 
-                    // Record stock movement - use recordMovement helper if available
+                    // Record stock movement
                     try {
                         if (method_exists(StockMovement::class, 'recordMovement')) {
                             StockMovement::recordMovement(
@@ -247,7 +248,6 @@ class POSController extends Controller
                             'error' => $e->getMessage(),
                             'product_id' => $productId
                         ]);
-                        // Don't fail the transaction if stock movement logging fails
                     }
 
                     \Log::info('Stock movement recorded successfully', [
@@ -259,7 +259,7 @@ class POSController extends Controller
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString()
                     ]);
-                    throw $e; // Re-throw to trigger main catch block
+                    throw $e;
                 }
             }
 

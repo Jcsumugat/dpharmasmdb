@@ -44,6 +44,7 @@ class DashboardController extends Controller
                 'pos' => $this->getPOSRevenue($dateRange),
                 'total' => $this->getTotalRevenue($dateRange),
             ],
+            'profit' => $this->getProfitStats($dateRange), // NEW: Profit data
             'orders' => [
                 'pending' => Order::where('status', 'pending')->count(),
                 'processing' => Order::where('status', 'approved')->count(),
@@ -78,6 +79,57 @@ class DashboardController extends Controller
         return Inertia::render('Admin/Dashboard', [
             'stats' => $stats,
         ]);
+    }
+
+    /**
+     * Get profit statistics
+     */
+    private function getProfitStats($dateRange)
+    {
+        $posTransactions = POSTransaction::where('status', 'completed')
+            ->whereBetween('created_at', $dateRange)
+            ->get();
+
+        $orders = Order::where('status', 'completed')
+            ->whereBetween('created_at', $dateRange)
+            ->get();
+
+        $posProfit = 0;
+        $ordersProfit = 0;
+
+        // Calculate POS profit
+        foreach ($posTransactions as $transaction) {
+            if (isset($transaction->items) && is_array($transaction->items)) {
+                foreach ($transaction->items as $item) {
+                    $quantity = $item['quantity'] ?? 0;
+                    $salePrice = $item['unit_price'] ?? 0;
+                    $unitCost = $item['unit_cost'] ?? 0;
+                    $posProfit += ($quantity * ($salePrice - $unitCost));
+                }
+            }
+        }
+
+        // Calculate Orders profit
+        foreach ($orders as $order) {
+            if (isset($order->items) && is_array($order->items)) {
+                foreach ($order->items as $item) {
+                    $quantity = $item['quantity'] ?? 0;
+                    $salePrice = $item['unit_price'] ?? 0;
+                    $unitCost = $item['unit_cost'] ?? 0;
+                    $ordersProfit += ($quantity * ($salePrice - $unitCost));
+                }
+            }
+        }
+
+        $totalRevenue = $this->getTotalRevenue($dateRange);
+        $totalProfit = $posProfit + $ordersProfit;
+
+        return [
+            'total' => (float) $totalProfit,
+            'pos' => (float) $posProfit,
+            'orders' => (float) $ordersProfit,
+            'profit_margin' => $totalRevenue > 0 ? (($totalProfit / $totalRevenue) * 100) : 0,
+        ];
     }
 
     /**
@@ -169,7 +221,6 @@ class DashboardController extends Controller
                 $end = $now->copy()->endOfDay();
         }
 
-        // Convert to MongoDB UTCDateTime
         return [
             new UTCDateTime($start->timestamp * 1000),
             new UTCDateTime($end->timestamp * 1000)
@@ -202,7 +253,6 @@ class DashboardController extends Controller
                 $end = $now->copy()->subDay()->endOfDay();
         }
 
-        // Convert to MongoDB UTCDateTime
         return [
             new UTCDateTime($start->timestamp * 1000),
             new UTCDateTime($end->timestamp * 1000)
@@ -265,9 +315,6 @@ class DashboardController extends Controller
         return (($current - $previous) / $previous) * 100;
     }
 
-    /**
-     * MongoDB-compatible low stock count
-     */
     private function getLowStockCount()
     {
         $count = 0;
@@ -282,9 +329,6 @@ class DashboardController extends Controller
         return $count;
     }
 
-    /**
-     * MongoDB-compatible expiring soon count
-     */
     private function getExpiringSoonCount()
     {
         $count = 0;
@@ -309,10 +353,9 @@ class DashboardController extends Controller
                         $expiryDate->gt(Carbon::now()) &&
                         $batch['quantity_remaining'] > 0) {
                         $count++;
-                        break; // Count product once even if multiple batches are expiring
+                        break;
                     }
                 } catch (\Exception $e) {
-                    // Skip invalid dates
                     continue;
                 }
             }
