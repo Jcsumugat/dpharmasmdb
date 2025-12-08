@@ -322,3 +322,38 @@ Route::fallback(function () {
     }
     return redirect()->route('customer.login');
 });
+Route::get('/test-db', function () {
+    try {
+        // Check extension
+        if (!extension_loaded('mongodb')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'MongoDB extension not loaded',
+                'solution' => 'Run: pecl install mongodb'
+            ]);
+        }
+
+        // Test connection
+        $ping = DB::connection('mongodb')->getMongoDB()->command(['ping' => 1]);
+
+        // Try to list collections
+        $collections = DB::connection('mongodb')
+            ->getMongoDB()
+            ->listCollections();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'MongoDB Atlas connected!',
+            'database' => config('database.connections.mongodb.database'),
+            'extension_version' => phpversion('mongodb'),
+            'collections' => iterator_to_array($collections)
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});

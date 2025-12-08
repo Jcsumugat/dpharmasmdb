@@ -63,15 +63,6 @@ export default function Dashboard({ stats }) {
                     <div className="mb-10">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <MetricCard
-                                icon="💰"
-                                iconBg="bg-blue-100"
-                                iconColor="text-sky-500"
-                                label="Total Revenue"
-                                value={formatCurrency(stats.overview.total_revenue.value)}
-                                change={stats.overview.total_revenue.change}
-                                changeLabel="vs previous period"
-                            />
-                            <MetricCard
                                 icon="💵"
                                 iconBg="bg-green-100"
                                 iconColor="text-green-500"
@@ -118,7 +109,7 @@ export default function Dashboard({ stats }) {
                                 gradientTo="to-sky-600"
                             />
                             <RevenueCard
-                                label="POS Sales"
+                                label="Walk in Sales"
                                 revenue={formatCurrency(stats.revenue.pos)}
                                 profit={stats.profit ? formatCurrency(stats.profit.pos) : '₱0.00'}
                                 icon="🏪"
