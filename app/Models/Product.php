@@ -102,20 +102,30 @@ class Product extends Model
             : new \MongoDB\BSON\ObjectId($batchId);
 
         return collect($this->batches)->first(function ($batch) use ($searchId) {
-            $batchObjectId = null;
-
-            if (isset($batch['_id'])) {
-                $batchObjectId = $batch['_id'] instanceof \MongoDB\BSON\ObjectId
-                    ? $batch['_id']
-                    : new \MongoDB\BSON\ObjectId($batch['_id']);
-            } elseif (isset($batch['id'])) {
-                $batchObjectId = $batch['id'] instanceof \MongoDB\BSON\ObjectId
-                    ? $batch['id']
-                    : new \MongoDB\BSON\ObjectId($batch['id']);
-            }
-
+            $batchObjectId = $this->extractBatchId($batch);
             return $batchObjectId && $batchObjectId == $searchId;
         });
+    }
+
+    /**
+     * Helper method to safely extract batch ID from batch array
+     */
+    private function extractBatchId($batch)
+    {
+        if (isset($batch['_id'])) {
+            return $batch['_id'] instanceof \MongoDB\BSON\ObjectId
+                ? $batch['_id']
+                : new \MongoDB\BSON\ObjectId($batch['_id']);
+        } elseif (isset($batch['id'])) {
+            if ($batch['id'] instanceof \MongoDB\BSON\ObjectId) {
+                return $batch['id'];
+            } elseif (is_array($batch['id']) && isset($batch['id']['$oid'])) {
+                return new \MongoDB\BSON\ObjectId($batch['id']['$oid']);
+            } elseif (is_string($batch['id'])) {
+                return new \MongoDB\BSON\ObjectId($batch['id']);
+            }
+        }
+        return null;
     }
 
     // Stock Management
@@ -135,7 +145,7 @@ class Product extends Model
     }
 
     /**
-     * Allocate quantity using FIFO from available batches
+     * Allocate quantity using FIFO from available batches - FIXED
      */
     public function allocateQuantity($requestedQuantity)
     {
@@ -153,18 +163,29 @@ class Product extends Model
             ];
         }
 
-        foreach ($availableBatches as $batch) {
+        foreach ($availableBatches as $index => $batch) {
             if ($remainingQuantity <= 0) break;
 
             $quantityFromBatch = min($remainingQuantity, $batch['quantity_remaining']);
 
+            // CRITICAL FIX: Safely get batch ID with isset checks
+            $batchId = null;
+            if (isset($batch['_id'])) {
+                $batchId = $batch['_id'];
+            } elseif (isset($batch['id'])) {
+                $batchId = $batch['id'];
+            } else {
+                // Last resort: use index
+                $batchId = $index;
+            }
+
             $allocation[] = [
-                'batch_id' => $batch['_id'],
-                'batch_number' => $batch['batch_number'],
+                'batch_id' => $batchId,
+                'batch_number' => isset($batch['batch_number']) ? $batch['batch_number'] : 'Unknown',
                 'quantity' => $quantityFromBatch,
-                'unit_cost' => $batch['unit_cost'],
-                'sale_price' => $batch['sale_price'],
-                'expiration_date' => $batch['expiration_date'],
+                'unit_cost' => isset($batch['unit_cost']) ? $batch['unit_cost'] : 0,
+                'sale_price' => isset($batch['sale_price']) ? $batch['sale_price'] : 0,
+                'expiration_date' => isset($batch['expiration_date']) ? $batch['expiration_date'] : null,
             ];
 
             $remainingQuantity -= $quantityFromBatch;
@@ -190,27 +211,33 @@ class Product extends Model
         $totalReduced = 0;
 
         foreach ($allocation['batches'] as $allocatedBatch) {
-            $searchId = $allocatedBatch['batch_id'] instanceof \MongoDB\BSON\ObjectId
-                ? $allocatedBatch['batch_id']
-                : new \MongoDB\BSON\ObjectId($allocatedBatch['batch_id']);
+            // Handle both ObjectId and index-based IDs
+            $searchId = $allocatedBatch['batch_id'];
 
-            $batchIndex = collect($batches)->search(function ($batch) use ($searchId) {
-                $batchObjectId = null;
-
-                if (isset($batch['_id'])) {
-                    $batchObjectId = $batch['_id'] instanceof \MongoDB\BSON\ObjectId
-                        ? $batch['_id']
-                        : new \MongoDB\BSON\ObjectId($batch['_id']);
-                } elseif (isset($batch['id'])) {
-                    $batchObjectId = $batch['id'] instanceof \MongoDB\BSON\ObjectId
-                        ? $batch['id']
-                        : new \MongoDB\BSON\ObjectId($batch['id']);
+            if ($searchId instanceof \MongoDB\BSON\ObjectId || is_string($searchId)) {
+                // Convert to ObjectId if it's a string
+                if (is_string($searchId) && strlen($searchId) == 24) {
+                    try {
+                        $searchId = new \MongoDB\BSON\ObjectId($searchId);
+                    } catch (\Exception $e) {
+                        // Not a valid ObjectId string, will use direct comparison
+                    }
                 }
 
-                return $batchObjectId && $batchObjectId == $searchId;
-            });
+                $batchIndex = collect($batches)->search(function ($batch) use ($searchId) {
+                    $batchObjectId = $this->extractBatchId($batch);
 
-            if ($batchIndex !== false) {
+                    if (!$batchObjectId) return false;
+
+                    // Compare as strings for safety
+                    return (string)$batchObjectId === (string)$searchId;
+                });
+            } else {
+                // It's an index
+                $batchIndex = $searchId;
+            }
+
+            if ($batchIndex !== false && isset($batches[$batchIndex])) {
                 $batches[$batchIndex]['quantity_remaining'] -= $allocatedBatch['quantity'];
                 $totalReduced += $allocatedBatch['quantity'];
             }
@@ -224,7 +251,7 @@ class Product extends Model
     }
 
     /**
-     * Add new batch (FIX: Include unit and unit_quantity)
+     * Add new batch
      */
     public function addBatch($batchData)
     {
@@ -241,7 +268,6 @@ class Product extends Model
             'received_date' => $batchData['received_date'] ?? now(),
             'supplier_id' => $batchData['supplier_id'] ?? $this->supplier_id,
             'notes' => $batchData['notes'] ?? null,
-            // FIX: Store unit information in batch
             'unit' => $batchData['unit'] ?? $this->unit,
             'unit_quantity' => isset($batchData['unit_quantity'])
                 ? (float) $batchData['unit_quantity']
@@ -276,37 +302,11 @@ class Product extends Model
         \Log::info('Searching for batch', [
             'search_id' => (string)$searchId,
             'batch_count' => count($batches),
-            'batches' => array_map(function ($b) {
-                return [
-                    '_id' => isset($b['_id']) ? (string)$b['_id'] : 'not set',
-                    'id' => isset($b['id']) ? (is_object($b['id']) ? (string)$b['id'] : $b['id']) : 'not set',
-                    'batch_number' => $b['batch_number'] ?? 'no number'
-                ];
-            }, $batches)
         ]);
 
         $batchIndex = collect($batches)->search(function ($batch) use ($searchId) {
-            // Handle both _id and id field names
-            $batchObjectId = null;
-
-            if (isset($batch['_id'])) {
-                $batchObjectId = $batch['_id'] instanceof \MongoDB\BSON\ObjectId
-                    ? $batch['_id']
-                    : new \MongoDB\BSON\ObjectId($batch['_id']);
-            } elseif (isset($batch['id'])) {
-                // Handle if id is already an ObjectId object or array with $oid
-                if ($batch['id'] instanceof \MongoDB\BSON\ObjectId) {
-                    $batchObjectId = $batch['id'];
-                } elseif (is_array($batch['id']) && isset($batch['id']['$oid'])) {
-                    $batchObjectId = new \MongoDB\BSON\ObjectId($batch['id']['$oid']);
-                } elseif (is_string($batch['id'])) {
-                    $batchObjectId = new \MongoDB\BSON\ObjectId($batch['id']);
-                }
-            }
-
-            $matches = $batchObjectId && (string)$batchObjectId === (string)$searchId;
-
-            return $matches;
+            $batchObjectId = $this->extractBatchId($batch);
+            return $batchObjectId && (string)$batchObjectId === (string)$searchId;
         });
 
         \Log::info('Batch search result', [
@@ -328,14 +328,13 @@ class Product extends Model
         return $batches[$batchIndex];
     }
 
-    // Pricing (FIX: Return float instead of potentially null/array)
+    // Pricing
     public function getCurrentPrice()
     {
         $nextBatch = $this->getAvailableBatches()->first();
         return $nextBatch ? (float) $nextBatch['sale_price'] : 0.0;
     }
 
-    // NEW: Get current unit cost from first available batch (FIFO)
     public function getCurrentUnitCost()
     {
         $nextBatch = $this->getAvailableBatches()->first();

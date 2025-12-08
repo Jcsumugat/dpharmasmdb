@@ -1,6 +1,4 @@
 <?php
-// FILE: app/Http/Controllers/Api/DashboardController.php
-// REPLACE EVERYTHING with MongoDB-compatible queries
 
 namespace App\Http\Controllers\Api;
 
@@ -9,9 +7,10 @@ use Inertia\Inertia;
 use App\Models\User;
 use App\Models\Product;
 use App\Models\Order;
-use App\Models\PosTransaction;
+use App\Models\POSTransaction;
 use App\Models\Prescription;
 use Carbon\Carbon;
+use MongoDB\BSON\UTCDateTime;
 
 class DashboardController extends Controller
 {
@@ -37,7 +36,7 @@ class DashboardController extends Controller
                     'value' => $this->getTotalOrders($dateRange),
                     'change' => $this->getOrdersChange($dateRange, $previousDateRange),
                 ],
-                'total_customers' => User::where('role', User::ROLE_CUSTOMER)->count(),
+                'total_customers' => User::where('role', 'customer')->count(),
                 'pending_prescriptions' => Prescription::where('status', 'pending')->count(),
             ],
             'revenue' => [
@@ -60,11 +59,11 @@ class DashboardController extends Controller
                 'expiring_soon' => $this->getExpiringSoonCount(),
             ],
             'customers' => [
-                'total' => User::where('role', User::ROLE_CUSTOMER)->count(),
-                'new' => User::where('role', User::ROLE_CUSTOMER)
+                'total' => User::where('role', 'customer')->count(),
+                'new' => User::where('role', 'customer')
                     ->whereBetween('created_at', $dateRange)
                     ->count(),
-                'active' => User::where('role', User::ROLE_CUSTOMER)
+                'active' => User::where('role', 'customer')
                     ->where('status', 'active')
                     ->count(),
             ],
@@ -86,24 +85,32 @@ class DashboardController extends Controller
      */
     public function getStats()
     {
-        $period = request('period', 'today');
-        $dateRange = $this->getDateRange($period);
-        $previousDateRange = $this->getPreviousDateRange($period);
+        try {
+            $period = request('period', 'today');
+            $dateRange = $this->getDateRange($period);
+            $previousDateRange = $this->getPreviousDateRange($period);
 
-        return response()->json([
-            'overview' => [
-                'total_revenue' => [
-                    'value' => $this->getTotalRevenue($dateRange),
-                    'change' => $this->getRevenueChange($dateRange, $previousDateRange),
+            return response()->json([
+                'success' => true,
+                'overview' => [
+                    'total_revenue' => [
+                        'value' => $this->getTotalRevenue($dateRange),
+                        'change' => $this->getRevenueChange($dateRange, $previousDateRange),
+                    ],
+                    'total_orders' => [
+                        'value' => $this->getTotalOrders($dateRange),
+                        'change' => $this->getOrdersChange($dateRange, $previousDateRange),
+                    ],
+                    'total_customers' => User::where('role', 'customer')->count(),
+                    'pending_prescriptions' => Prescription::where('status', 'pending')->count(),
                 ],
-                'total_orders' => [
-                    'value' => $this->getTotalOrders($dateRange),
-                    'change' => $this->getOrdersChange($dateRange, $previousDateRange),
-                ],
-                'total_customers' => User::where('role', User::ROLE_CUSTOMER)->count(),
-                'pending_prescriptions' => Prescription::where('status', 'pending')->count(),
-            ],
-        ]);
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching stats: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -111,20 +118,28 @@ class DashboardController extends Controller
      */
     public function getRecentActivity()
     {
-        $recentOrders = Order::with('customer')
-            ->latest()
-            ->take(5)
-            ->get();
+        try {
+            $recentOrders = Order::with('customer')
+                ->latest()
+                ->take(5)
+                ->get();
 
-        $recentPrescriptions = Prescription::with('customer')
-            ->latest()
-            ->take(5)
-            ->get();
+            $recentPrescriptions = Prescription::with('customer')
+                ->latest()
+                ->take(5)
+                ->get();
 
-        return response()->json([
-            'recent_orders' => $recentOrders,
-            'recent_prescriptions' => $recentPrescriptions,
-        ]);
+            return response()->json([
+                'success' => true,
+                'recent_orders' => $recentOrders,
+                'recent_prescriptions' => $recentPrescriptions,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching recent activity: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     // Private helper methods
@@ -134,16 +149,31 @@ class DashboardController extends Controller
 
         switch ($period) {
             case 'today':
-                return [$now->copy()->startOfDay(), $now->copy()->endOfDay()];
+                $start = $now->copy()->startOfDay();
+                $end = $now->copy()->endOfDay();
+                break;
             case 'week':
-                return [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()];
+                $start = $now->copy()->startOfWeek();
+                $end = $now->copy()->endOfWeek();
+                break;
             case 'month':
-                return [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()];
+                $start = $now->copy()->startOfMonth();
+                $end = $now->copy()->endOfMonth();
+                break;
             case 'year':
-                return [$now->copy()->startOfYear(), $now->copy()->endOfYear()];
+                $start = $now->copy()->startOfYear();
+                $end = $now->copy()->endOfYear();
+                break;
             default:
-                return [$now->copy()->startOfDay(), $now->copy()->endOfDay()];
+                $start = $now->copy()->startOfDay();
+                $end = $now->copy()->endOfDay();
         }
+
+        // Convert to MongoDB UTCDateTime
+        return [
+            new UTCDateTime($start->timestamp * 1000),
+            new UTCDateTime($end->timestamp * 1000)
+        ];
     }
 
     private function getPreviousDateRange($period)
@@ -152,21 +182,36 @@ class DashboardController extends Controller
 
         switch ($period) {
             case 'today':
-                return [$now->copy()->subDay()->startOfDay(), $now->copy()->subDay()->endOfDay()];
+                $start = $now->copy()->subDay()->startOfDay();
+                $end = $now->copy()->subDay()->endOfDay();
+                break;
             case 'week':
-                return [$now->copy()->subWeek()->startOfWeek(), $now->copy()->subWeek()->endOfWeek()];
+                $start = $now->copy()->subWeek()->startOfWeek();
+                $end = $now->copy()->subWeek()->endOfWeek();
+                break;
             case 'month':
-                return [$now->copy()->subMonth()->startOfMonth(), $now->copy()->subMonth()->endOfMonth()];
+                $start = $now->copy()->subMonth()->startOfMonth();
+                $end = $now->copy()->subMonth()->endOfMonth();
+                break;
             case 'year':
-                return [$now->copy()->subYear()->startOfYear(), $now->copy()->subYear()->endOfYear()];
+                $start = $now->copy()->subYear()->startOfYear();
+                $end = $now->copy()->subYear()->endOfYear();
+                break;
             default:
-                return [$now->copy()->subDay()->startOfDay(), $now->copy()->subDay()->endOfDay()];
+                $start = $now->copy()->subDay()->startOfDay();
+                $end = $now->copy()->subDay()->endOfDay();
         }
+
+        // Convert to MongoDB UTCDateTime
+        return [
+            new UTCDateTime($start->timestamp * 1000),
+            new UTCDateTime($end->timestamp * 1000)
+        ];
     }
 
     private function getTotalRevenue($dateRange)
     {
-        $posRevenue = PosTransaction::whereBetween('created_at', $dateRange)
+        $posRevenue = POSTransaction::whereBetween('created_at', $dateRange)
             ->where('status', 'completed')
             ->sum('total_amount');
 
@@ -174,19 +219,19 @@ class DashboardController extends Controller
             ->where('status', 'completed')
             ->sum('total_amount');
 
-        return $posRevenue + $orderRevenue;
+        return (float) ($posRevenue + $orderRevenue);
     }
 
     private function getOnlineRevenue($dateRange)
     {
-        return Order::whereBetween('created_at', $dateRange)
+        return (float) Order::whereBetween('created_at', $dateRange)
             ->where('status', 'completed')
             ->sum('total_amount');
     }
 
     private function getPOSRevenue($dateRange)
     {
-        return PosTransaction::whereBetween('created_at', $dateRange)
+        return (float) POSTransaction::whereBetween('created_at', $dateRange)
             ->where('status', 'completed')
             ->sum('total_amount');
     }
@@ -222,7 +267,6 @@ class DashboardController extends Controller
 
     /**
      * MongoDB-compatible low stock count
-     * Can't use whereRaw with MongoDB, need to iterate
      */
     private function getLowStockCount()
     {

@@ -12,9 +12,10 @@ export default function AuthenticatedLayout({ children }) {
 
     const navigation = [
         { name: 'Dashboard', href: 'admin.dashboard', icon: '📊' },
+        { name: 'POS', href: 'admin.pos', icon: '💰' },
         { name: 'Suppliers', href: 'admin.suppliers', icon: '📦' },
         { name: 'Products', href: 'admin.products', icon: '💊' },
-         { name: 'Orders', href: 'admin.orders', icon: '🛒' },
+        { name: 'Orders', href: 'admin.orders', icon: '🛒' },
         { name: 'Prescriptions', href: 'admin.prescriptions', icon: '📋' },
         { name: 'Customers', href: 'admin.customers', icon: '👥' },
         { name: 'Notifications', href: 'admin.notifications', icon: '🔔' },

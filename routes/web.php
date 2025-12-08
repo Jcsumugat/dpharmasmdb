@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\POSController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -114,6 +115,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
             }
         })->name('orders.detail');
 
+        // POS page
+        Route::get('/pos', function () {
+            return Inertia::render('Admin/POS/Index');
+        })->name('pos');
+
         // Prescriptions page (now handles orders too)
         Route::get('/prescriptions', function () {
             return Inertia::render('Admin/Prescriptions/Index');
@@ -176,6 +182,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
             Route::get('/orders/{id}', [OrderController::class, 'show'])->name('orders.show');
 
+            // POS API routes
+            Route::prefix('pos')->name('pos.')->group(function () {
+                Route::get('/products/search', [POSController::class, 'searchProducts'])->name('products.search');
+                Route::get('/products/{id}', [POSController::class, 'getProduct'])->name('products.show');
+                Route::post('/process-transaction', [POSController::class, 'processTransaction'])->name('process-transaction');
+                Route::get('/transactions', [POSController::class, 'getTransactions'])->name('transactions');
+            });
+
             // Prescriptions (now includes order management)
             Route::get('/prescriptions', [PrescriptionController::class, 'index'])->name('prescriptions.index');
             Route::get('/prescriptions/{id}', [PrescriptionController::class, 'show'])->name('prescriptions.show');
@@ -223,15 +237,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::delete('/notifications/delete-all-read', [NotificationController::class, 'deleteAllRead'])->name('notifications.delete-all-read');
         });
 
-        // Reports
-        Route::prefix('reports')->name('reports.')->group(function () {
-            Route::get('/dashboard', [ReportController::class, 'dashboard'])->name('dashboard');
-            Route::get('/sales', [ReportController::class, 'sales'])->name('sales');
-            Route::get('/inventory', [ReportController::class, 'inventory'])->name('inventory');
-            Route::get('/top-products', [ReportController::class, 'topProducts'])->name('top-products');
-            Route::get('/expiring-products', [ReportController::class, 'expiringProducts'])->name('expiring-products');
-            Route::get('/customers', [ReportController::class, 'customers'])->name('customers');
-            Route::get('/prescriptions', [ReportController::class, 'prescriptions'])->name('prescriptions');
+        // In routes/web.php or routes/api.php
+        Route::middleware(['auth', 'admin'])->prefix('admin/api')->group(function () {
+            Route::get('/reports/dashboard', [ReportController::class, 'dashboard']);
+            Route::get('/reports/sales', [ReportController::class, 'sales']);
+            Route::get('/reports/inventory', [ReportController::class, 'inventory']);
+            Route::get('/reports/top-products', [ReportController::class, 'topProducts']);
+            Route::get('/reports/expiring-products', [ReportController::class, 'expiringProducts']);
+            Route::get('/reports/prescriptions', [ReportController::class, 'prescriptions']);
+            Route::get('/reports/customers', [ReportController::class, 'customers']);
         });
     });
 });

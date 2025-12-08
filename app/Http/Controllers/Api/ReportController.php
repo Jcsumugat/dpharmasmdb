@@ -13,7 +13,6 @@ use Illuminate\Http\Request;
 use Carbon\Carbon;
 use MongoDB\BSON\UTCDateTime;
 
-
 class ReportController extends Controller
 {
     /**
@@ -21,15 +20,14 @@ class ReportController extends Controller
      */
     public function dashboard(Request $request)
     {
-        $period = $request->get('period', 'today'); // today, week, month, year
+        $period = $request->get('period', 'today');
         $dateRange = $this->getDateRange($period);
 
         $stats = [
-            'sales' => $this->getSalesStats($dateRange),
+            'revenue' => $this->getRevenueStats($dateRange),
             'orders' => $this->getOrdersStats($dateRange),
             'inventory' => $this->getInventoryStats(),
             'customers' => $this->getCustomersStats($dateRange),
-            'revenue' => $this->getRevenueStats($dateRange),
         ];
 
         return response()->json([
@@ -50,39 +48,47 @@ class ReportController extends Controller
             'group_by' => 'nullable|in:day,week,month',
         ]);
 
-        $startDate = new UTCDateTime(Carbon::parse($validated['start_date'])->startOfDay()->timestamp * 1000);
-        $endDate = new UTCDateTime(Carbon::parse($validated['end_date'])->endOfDay()->timestamp * 1000);
+        try {
+            $startDate = new UTCDateTime(Carbon::parse($validated['start_date'])->startOfDay()->timestamp * 1000);
+            $endDate = new UTCDateTime(Carbon::parse($validated['end_date'])->endOfDay()->timestamp * 1000);
 
-        // POS Transactions
-        $posTransactions = POSTransaction::where('status', 'completed')
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->get();
+            // Get completed transactions
+            $posTransactions = POSTransaction::where('status', 'completed')
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->get();
 
-        // Orders
-        $orders = Order::where('status', 'completed')
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->get();
+            $orders = Order::where('status', 'completed')
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->get();
 
-        $totalRevenue = $posTransactions->sum('total_amount') + $orders->sum('total_amount');
-        $totalTransactions = $posTransactions->count() + $orders->count();
+            $totalRevenue = $posTransactions->sum('total_amount') + $orders->sum('total_amount');
+            $totalTransactions = $posTransactions->count() + $orders->count();
 
-        $salesByDate = $this->groupSalesByDate(
-            $posTransactions,
-            $orders,
-            $validated['group_by'] ?? 'day'
-        );
+            $salesByDate = $this->groupSalesByDate(
+                $posTransactions,
+                $orders,
+                $validated['group_by'] ?? 'day'
+            );
 
-        return response()->json([
-            'success' => true,
-            'report' => [
-                'total_revenue' => $totalRevenue,
-                'total_transactions' => $totalTransactions,
-                'average_transaction' => $totalTransactions > 0 ? $totalRevenue / $totalTransactions : 0,
-                'pos_revenue' => $posTransactions->sum('total_amount'),
-                'orders_revenue' => $orders->sum('total_amount'),
-                'sales_by_date' => $salesByDate,
-            ]
-        ]);
+            return response()->json([
+                'success' => true,
+                'report' => [
+                    'total_revenue' => (float) $totalRevenue,
+                    'total_transactions' => $totalTransactions,
+                    'average_transaction' => $totalTransactions > 0 ? (float) ($totalRevenue / $totalTransactions) : 0,
+                    'pos_revenue' => (float) $posTransactions->sum('total_amount'),
+                    'orders_revenue' => (float) $orders->sum('total_amount'),
+                    'pos_transactions' => $posTransactions->count(),
+                    'online_orders' => $orders->count(),
+                    'sales_by_date' => $salesByDate,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error generating sales report: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -90,30 +96,65 @@ class ReportController extends Controller
      */
     public function inventory(Request $request)
     {
-        $type = $request->get('type', 'all'); // all, low_stock, expiring, out_of_stock
+        $type = $request->get('type', 'all');
 
         $query = Product::query();
 
         switch ($type) {
             case 'low_stock':
-                $query->whereRaw('this.stock_quantity <= this.reorder_level');
+                $query->where(function ($q) {
+                    $q->whereRaw([
+                        '$expr' => [
+                            '$lte' => ['$stock_quantity', '$reorder_level']
+                        ]
+                    ])->where('stock_quantity', '>', 0);
+                });
                 break;
             case 'out_of_stock':
                 $query->where('stock_quantity', '<=', 0);
                 break;
             case 'expiring':
-                // Products with batches expiring in next 30 days
-                $thirtyDaysFromNow = new UTCDateTime(Carbon::now()->addDays(30)->timestamp * 1000);
-                $query->where('batches.expiration_date', '<=', $thirtyDaysFromNow)
-                      ->where('batches.expiration_date', '>', new UTCDateTime(Carbon::now()->timestamp * 1000));
-                break;
+                $thirtyDaysFromNow = Carbon::now()->addDays(30);
+                $products = Product::all()->filter(function ($product) use ($thirtyDaysFromNow) {
+                    if (!isset($product->batches) || !is_array($product->batches)) {
+                        return false;
+                    }
+                    return collect($product->batches)->some(function ($batch) use ($thirtyDaysFromNow) {
+                        return isset($batch['quantity_remaining'])
+                            && $batch['quantity_remaining'] > 0
+                            && isset($batch['expiration_date'])
+                            && Carbon::parse($batch['expiration_date'])->lte($thirtyDaysFromNow)
+                            && Carbon::parse($batch['expiration_date'])->gte(Carbon::now());
+                    });
+                });
+
+                return response()->json([
+                    'success' => true,
+                    'report' => [
+                        'products' => $products->values(),
+                        'summary' => [
+                            'total_products' => Product::count(),
+                            'low_stock_count' => Product::where(function ($q) {
+                                $q->whereRaw([
+                                    '$expr' => ['$lte' => ['$stock_quantity', '$reorder_level']]
+                                ])->where('stock_quantity', '>', 0);
+                            })->count(),
+                            'out_of_stock_count' => Product::where('stock_quantity', '<=', 0)->count(),
+                            'total_inventory_value' => $this->calculateInventoryValue(),
+                        ]
+                    ]
+                ]);
         }
 
         $products = $query->with(['category', 'supplier'])->get();
 
         $summary = [
             'total_products' => Product::count(),
-            'low_stock_count' => Product::whereRaw('this.stock_quantity <= this.reorder_level')->count(),
+            'low_stock_count' => Product::where(function ($q) {
+                $q->whereRaw([
+                    '$expr' => ['$lte' => ['$stock_quantity', '$reorder_level']]
+                ])->where('stock_quantity', '>', 0);
+            })->count(),
             'out_of_stock_count' => Product::where('stock_quantity', '<=', 0)->count(),
             'total_inventory_value' => $this->calculateInventoryValue(),
         ];
@@ -138,41 +179,99 @@ class ReportController extends Controller
             'limit' => 'nullable|integer|min:1|max:100',
         ]);
 
-        $limit = $validated['limit'] ?? 10;
-        $startDate = new UTCDateTime(Carbon::parse($validated['start_date'])->startOfDay()->timestamp * 1000);
-        $endDate = new UTCDateTime(Carbon::parse($validated['end_date'])->endOfDay()->timestamp * 1000);
+        try {
+            $limit = $validated['limit'] ?? 10;
+            $startDate = new UTCDateTime(Carbon::parse($validated['start_date'])->startOfDay()->timestamp * 1000);
+            $endDate = new UTCDateTime(Carbon::parse($validated['end_date'])->endOfDay()->timestamp * 1000);
 
-        // Get stock movements for sales
-        $movements = StockMovement::whereIn('type', ['sale', 'pos_transaction'])
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->get();
+            // Get POS transactions
+            $posTransactions = POSTransaction::where('status', 'completed')
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->get();
 
-        // Group by product and sum quantities
-        $productSales = $movements->groupBy('product_id')->map(function ($group) {
-            return [
-                'product_id' => $group->first()->product_id,
-                'total_quantity' => abs($group->sum('quantity')),
-                'transaction_count' => $group->count()
-            ];
-        })->sortByDesc('total_quantity')->take($limit)->values();
+            // Get Orders
+            $orders = Order::where('status', 'completed')
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->get();
 
-        // Enrich with product data
-        $products = [];
-        foreach ($productSales as $sale) {
-            $product = Product::find($sale['product_id']);
-            if ($product) {
-                $products[] = [
-                    'product' => $product,
-                    'total_quantity' => $sale['total_quantity'],
-                    'transaction_count' => $sale['transaction_count']
-                ];
+            // Combine and aggregate product sales
+            $productSales = [];
+
+            // From POS transactions
+            foreach ($posTransactions as $transaction) {
+                if (isset($transaction->items) && is_array($transaction->items)) {
+                    foreach ($transaction->items as $item) {
+                        $productId = $item['product_id'] ?? null;
+                        if ($productId) {
+                            if (!isset($productSales[$productId])) {
+                                $productSales[$productId] = [
+                                    'product_id' => $productId,
+                                    'total_quantity' => 0,
+                                    'transaction_count' => 0,
+                                    'total_revenue' => 0
+                                ];
+                            }
+                            $productSales[$productId]['total_quantity'] += $item['quantity'] ?? 0;
+                            $productSales[$productId]['transaction_count']++;
+                            $productSales[$productId]['total_revenue'] += ($item['quantity'] ?? 0) * ($item['price'] ?? 0);
+                        }
+                    }
+                }
             }
-        }
 
-        return response()->json([
-            'success' => true,
-            'report' => $products
-        ]);
+            // From Orders
+            foreach ($orders as $order) {
+                if (isset($order->items) && is_array($order->items)) {
+                    foreach ($order->items as $item) {
+                        $productId = $item['product_id'] ?? null;
+                        if ($productId) {
+                            if (!isset($productSales[$productId])) {
+                                $productSales[$productId] = [
+                                    'product_id' => $productId,
+                                    'total_quantity' => 0,
+                                    'transaction_count' => 0,
+                                    'total_revenue' => 0
+                                ];
+                            }
+                            $productSales[$productId]['total_quantity'] += $item['quantity'] ?? 0;
+                            $productSales[$productId]['transaction_count']++;
+                            $productSales[$productId]['total_revenue'] += ($item['quantity'] ?? 0) * ($item['price'] ?? 0);
+                        }
+                    }
+                }
+            }
+
+            // Sort by total quantity and limit
+            usort($productSales, function($a, $b) {
+                return $b['total_quantity'] - $a['total_quantity'];
+            });
+
+            $topSales = array_slice($productSales, 0, $limit);
+
+            // Enrich with product data
+            $products = [];
+            foreach ($topSales as $sale) {
+                $product = Product::find($sale['product_id']);
+                if ($product) {
+                    $products[] = [
+                        'product' => $product,
+                        'total_quantity' => $sale['total_quantity'],
+                        'transaction_count' => $sale['transaction_count'],
+                        'total_revenue' => (float) $sale['total_revenue']
+                    ];
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'report' => $products
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error generating top products report: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -183,11 +282,14 @@ class ReportController extends Controller
         $days = $request->get('days', 30);
         $futureDate = Carbon::now()->addDays($days);
 
-        $products = Product::where('batches', 'exists', true)
-            ->get()
+        $products = Product::all()
             ->filter(function ($product) use ($futureDate) {
+                if (!isset($product->batches) || !is_array($product->batches)) {
+                    return false;
+                }
                 return collect($product->batches)->some(function ($batch) use ($futureDate) {
-                    return $batch['quantity_remaining'] > 0
+                    return isset($batch['quantity_remaining'])
+                        && $batch['quantity_remaining'] > 0
                         && isset($batch['expiration_date'])
                         && Carbon::parse($batch['expiration_date'])->lte($futureDate)
                         && Carbon::parse($batch['expiration_date'])->gte(Carbon::now());
@@ -195,11 +297,12 @@ class ReportController extends Controller
             })
             ->map(function ($product) use ($futureDate) {
                 $expiringBatches = collect($product->batches)->filter(function ($batch) use ($futureDate) {
-                    return $batch['quantity_remaining'] > 0
+                    return isset($batch['quantity_remaining'])
+                        && $batch['quantity_remaining'] > 0
                         && isset($batch['expiration_date'])
                         && Carbon::parse($batch['expiration_date'])->lte($futureDate)
                         && Carbon::parse($batch['expiration_date'])->gte(Carbon::now());
-                })->values();
+                })->sortBy('expiration_date')->values();
 
                 $product->expiring_batches = $expiringBatches;
                 return $product;
@@ -286,49 +389,30 @@ class ReportController extends Controller
         switch ($period) {
             case 'today':
                 return [
-                    new UTCDateTime($now->startOfDay()->timestamp * 1000),
-                    new UTCDateTime($now->endOfDay()->timestamp * 1000)
+                    new UTCDateTime($now->copy()->startOfDay()->timestamp * 1000),
+                    new UTCDateTime($now->copy()->endOfDay()->timestamp * 1000)
                 ];
             case 'week':
                 return [
-                    new UTCDateTime($now->startOfWeek()->timestamp * 1000),
-                    new UTCDateTime($now->endOfWeek()->timestamp * 1000)
+                    new UTCDateTime($now->copy()->startOfWeek()->timestamp * 1000),
+                    new UTCDateTime($now->copy()->endOfWeek()->timestamp * 1000)
                 ];
             case 'month':
                 return [
-                    new UTCDateTime($now->startOfMonth()->timestamp * 1000),
-                    new UTCDateTime($now->endOfMonth()->timestamp * 1000)
+                    new UTCDateTime($now->copy()->startOfMonth()->timestamp * 1000),
+                    new UTCDateTime($now->copy()->endOfMonth()->timestamp * 1000)
                 ];
             case 'year':
                 return [
-                    new UTCDateTime($now->startOfYear()->timestamp * 1000),
-                    new UTCDateTime($now->endOfYear()->timestamp * 1000)
+                    new UTCDateTime($now->copy()->startOfYear()->timestamp * 1000),
+                    new UTCDateTime($now->copy()->endOfYear()->timestamp * 1000)
                 ];
             default:
                 return [
-                    new UTCDateTime($now->startOfDay()->timestamp * 1000),
-                    new UTCDateTime($now->endOfDay()->timestamp * 1000)
+                    new UTCDateTime($now->copy()->startOfDay()->timestamp * 1000),
+                    new UTCDateTime($now->copy()->endOfDay()->timestamp * 1000)
                 ];
         }
-    }
-
-    private function getSalesStats($dateRange)
-    {
-        $posRevenue = POSTransaction::where('status', 'completed')
-            ->whereBetween('created_at', $dateRange)
-            ->sum('total_amount');
-
-        $ordersRevenue = Order::where('status', 'completed')
-            ->whereBetween('created_at', $dateRange)
-            ->sum('total_amount');
-
-        return [
-            'total_revenue' => $posRevenue + $ordersRevenue,
-            'pos_revenue' => $posRevenue,
-            'orders_revenue' => $ordersRevenue,
-            'transaction_count' => POSTransaction::whereBetween('created_at', $dateRange)->count() +
-                                   Order::whereBetween('created_at', $dateRange)->count()
-        ];
     }
 
     private function getOrdersStats($dateRange)
@@ -338,6 +422,8 @@ class ReportController extends Controller
         return [
             'total' => $orders->count(),
             'pending' => $orders->where('status', 'pending')->count(),
+            'preparing' => $orders->where('status', 'preparing')->count(),
+            'ready_for_pickup' => $orders->where('status', 'ready_for_pickup')->count(),
             'completed' => $orders->where('status', 'completed')->count(),
             'cancelled' => $orders->where('status', 'cancelled')->count(),
         ];
@@ -347,7 +433,11 @@ class ReportController extends Controller
     {
         return [
             'total_products' => Product::count(),
-            'low_stock' => Product::whereRaw('this.stock_quantity <= this.reorder_level')->count(),
+            'low_stock' => Product::where(function ($q) {
+                $q->whereRaw([
+                    '$expr' => ['$lte' => ['$stock_quantity', '$reorder_level']]
+                ])->where('stock_quantity', '>', 0);
+            })->count(),
             'out_of_stock' => Product::where('stock_quantity', '<=', 0)->count(),
             'total_value' => $this->calculateInventoryValue(),
         ];
@@ -373,9 +463,9 @@ class ReportController extends Controller
             ->sum('total_amount');
 
         return [
-            'total' => $posRevenue + $ordersRevenue,
-            'pos' => $posRevenue,
-            'orders' => $ordersRevenue,
+            'total' => (float) ($posRevenue + $ordersRevenue),
+            'pos' => (float) $posRevenue,
+            'orders' => (float) $ordersRevenue,
         ];
     }
 
@@ -387,47 +477,65 @@ class ReportController extends Controller
         foreach ($products as $product) {
             if (isset($product->batches) && is_array($product->batches)) {
                 foreach ($product->batches as $batch) {
-                    $totalValue += ($batch['quantity_remaining'] ?? 0) * ($batch['unit_cost'] ?? 0);
+                    $quantity = $batch['quantity_remaining'] ?? 0;
+                    $cost = $batch['unit_cost'] ?? 0;
+                    $totalValue += $quantity * $cost;
                 }
             }
         }
 
-        return $totalValue;
+        return (float) $totalValue;
     }
 
     private function groupSalesByDate($posTransactions, $orders, $groupBy)
     {
-        $allTransactions = collect();
+        $allTransactions = [];
 
         foreach ($posTransactions as $transaction) {
-            $allTransactions->push([
-                'date' => Carbon::parse($transaction->created_at),
+            $date = Carbon::parse($transaction->created_at);
+            $allTransactions[] = [
+                'date' => $date,
                 'amount' => $transaction->total_amount
-            ]);
+            ];
         }
 
         foreach ($orders as $order) {
-            $allTransactions->push([
-                'date' => Carbon::parse($order->created_at),
+            $date = Carbon::parse($order->created_at);
+            $allTransactions[] = [
+                'date' => $date,
                 'amount' => $order->total_amount
-            ]);
+            ];
         }
 
-        $grouped = $allTransactions->groupBy(function ($item) use ($groupBy) {
+        // Group by date format
+        $grouped = [];
+        foreach ($allTransactions as $transaction) {
+            $key = '';
             switch ($groupBy) {
                 case 'week':
-                    return $item['date']->format('Y-W');
+                    $key = $transaction['date']->format('Y-W');
+                    break;
                 case 'month':
-                    return $item['date']->format('Y-m');
+                    $key = $transaction['date']->format('Y-m');
+                    break;
                 default:
-                    return $item['date']->format('Y-m-d');
+                    $key = $transaction['date']->format('Y-m-d');
+                    break;
             }
-        })->map(function ($group) {
-            return [
-                'total' => $group->sum('amount'),
-                'count' => $group->count()
-            ];
-        });
+
+            if (!isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'total' => 0,
+                    'count' => 0
+                ];
+            }
+
+            $grouped[$key]['total'] += (float) $transaction['amount'];
+            $grouped[$key]['count']++;
+        }
+
+        // Sort by key
+        ksort($grouped);
 
         return $grouped;
     }
@@ -473,7 +581,7 @@ class ReportController extends Controller
             if ($customer) {
                 $topCustomers[] = [
                     'customer' => $customer,
-                    'total_spent' => $spending['total_spent'],
+                    'total_spent' => (float) $spending['total_spent'],
                     'order_count' => $spending['order_count']
                 ];
             }

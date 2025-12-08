@@ -5,6 +5,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 export default function ReportsIndex() {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
     const [dashboardStats, setDashboardStats] = useState(null);
     const [salesReport, setSalesReport] = useState(null);
     const [inventoryReport, setInventoryReport] = useState(null);
@@ -12,44 +13,109 @@ export default function ReportsIndex() {
     const [expiringProducts, setExpiringProducts] = useState([]);
     const [prescriptionStats, setPrescriptionStats] = useState(null);
 
+    // Set default dates to today
+    const today = new Date().toISOString().split('T')[0];
+    const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+
     const [filters, setFilters] = useState({
         period: 'today',
-        start_date: '',
-        end_date: '',
+        start_date: today,
+        end_date: today,
         inventory_type: 'all',
         expiring_days: 30
     });
+
+    // Get date range based on period
+    const getDateRange = (period) => {
+        const now = new Date();
+        let start, end;
+
+        switch (period) {
+            case 'today':
+                start = end = now.toISOString().split('T')[0];
+                break;
+            case 'week':
+                const weekStart = new Date(now);
+                weekStart.setDate(now.getDate() - now.getDay());
+                start = weekStart.toISOString().split('T')[0];
+                end = now.toISOString().split('T')[0];
+                break;
+            case 'month':
+                start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                end = now.toISOString().split('T')[0];
+                break;
+            case 'year':
+                start = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+                end = now.toISOString().split('T')[0];
+                break;
+            case 'custom':
+                return { start: filters.start_date, end: filters.end_date };
+            default:
+                start = end = now.toISOString().split('T')[0];
+        }
+
+        return { start, end };
+    };
 
     useEffect(() => {
         if (activeTab === 'dashboard') {
             fetchDashboardStats();
         } else if (activeTab === 'sales') {
-            if (filters.start_date && filters.end_date) {
-                fetchSalesReport();
-            }
+            fetchSalesReport();
         } else if (activeTab === 'inventory') {
             fetchInventoryReport();
         } else if (activeTab === 'top-products') {
-            if (filters.start_date && filters.end_date) {
-                fetchTopProducts();
-            }
+            fetchTopProducts();
         } else if (activeTab === 'expiring') {
             fetchExpiringProducts();
         } else if (activeTab === 'prescriptions') {
             fetchPrescriptionStats();
         }
-    }, [activeTab, filters.period, filters.inventory_type, filters.expiring_days]);
+    }, [activeTab]);
+
+    // Auto-fetch when period changes (except for custom)
+    useEffect(() => {
+        if (filters.period !== 'custom') {
+            if (activeTab === 'dashboard') {
+                fetchDashboardStats();
+            } else if (activeTab === 'sales') {
+                fetchSalesReport();
+            } else if (activeTab === 'top-products') {
+                fetchTopProducts();
+            } else if (activeTab === 'prescriptions') {
+                fetchPrescriptionStats();
+            }
+        }
+    }, [filters.period]);
+
+    // Auto-fetch inventory when type changes
+    useEffect(() => {
+        if (activeTab === 'inventory') {
+            fetchInventoryReport();
+        }
+    }, [filters.inventory_type]);
+
+    // Auto-fetch expiring when days changes
+    useEffect(() => {
+        if (activeTab === 'expiring') {
+            fetchExpiringProducts();
+        }
+    }, [filters.expiring_days]);
 
     const fetchDashboardStats = async () => {
         setLoading(true);
+        setError(null);
         try {
             const response = await fetch(`/admin/api/reports/dashboard?period=${filters.period}`);
             const data = await response.json();
             if (data.success) {
                 setDashboardStats(data.stats);
+            } else {
+                setError(data.message || 'Failed to fetch dashboard stats');
             }
         } catch (error) {
             console.error('Error fetching dashboard:', error);
+            setError('Network error: Unable to fetch dashboard stats');
         } finally {
             setLoading(false);
         }
@@ -57,14 +123,21 @@ export default function ReportsIndex() {
 
     const fetchSalesReport = async () => {
         setLoading(true);
+        setError(null);
         try {
-            const response = await fetch(`/admin/api/reports/sales?start_date=${filters.start_date}&end_date=${filters.end_date}&group_by=day`);
+            const dateRange = getDateRange(filters.period);
+            const response = await fetch(
+                `/admin/api/reports/sales?start_date=${dateRange.start}&end_date=${dateRange.end}&group_by=day`
+            );
             const data = await response.json();
             if (data.success) {
                 setSalesReport(data.report);
+            } else {
+                setError(data.message || 'Failed to fetch sales report');
             }
         } catch (error) {
             console.error('Error fetching sales:', error);
+            setError('Network error: Unable to fetch sales report');
         } finally {
             setLoading(false);
         }
@@ -72,14 +145,18 @@ export default function ReportsIndex() {
 
     const fetchInventoryReport = async () => {
         setLoading(true);
+        setError(null);
         try {
             const response = await fetch(`/admin/api/reports/inventory?type=${filters.inventory_type}`);
             const data = await response.json();
             if (data.success) {
                 setInventoryReport(data.report);
+            } else {
+                setError(data.message || 'Failed to fetch inventory report');
             }
         } catch (error) {
             console.error('Error fetching inventory:', error);
+            setError('Network error: Unable to fetch inventory report');
         } finally {
             setLoading(false);
         }
@@ -87,14 +164,21 @@ export default function ReportsIndex() {
 
     const fetchTopProducts = async () => {
         setLoading(true);
+        setError(null);
         try {
-            const response = await fetch(`/admin/api/reports/top-products?start_date=${filters.start_date}&end_date=${filters.end_date}&limit=10`);
+            const dateRange = getDateRange(filters.period);
+            const response = await fetch(
+                `/admin/api/reports/top-products?start_date=${dateRange.start}&end_date=${dateRange.end}&limit=10`
+            );
             const data = await response.json();
             if (data.success) {
                 setTopProducts(data.report);
+            } else {
+                setError(data.message || 'Failed to fetch top products');
             }
         } catch (error) {
             console.error('Error fetching top products:', error);
+            setError('Network error: Unable to fetch top products');
         } finally {
             setLoading(false);
         }
@@ -102,14 +186,18 @@ export default function ReportsIndex() {
 
     const fetchExpiringProducts = async () => {
         setLoading(true);
+        setError(null);
         try {
             const response = await fetch(`/admin/api/reports/expiring-products?days=${filters.expiring_days}`);
             const data = await response.json();
             if (data.success) {
                 setExpiringProducts(data.report.products);
+            } else {
+                setError(data.message || 'Failed to fetch expiring products');
             }
         } catch (error) {
             console.error('Error fetching expiring products:', error);
+            setError('Network error: Unable to fetch expiring products');
         } finally {
             setLoading(false);
         }
@@ -117,18 +205,23 @@ export default function ReportsIndex() {
 
     const fetchPrescriptionStats = async () => {
         setLoading(true);
+        setError(null);
         try {
+            const dateRange = getDateRange(filters.period);
             const params = new URLSearchParams();
-            if (filters.start_date) params.append('start_date', filters.start_date);
-            if (filters.end_date) params.append('end_date', filters.end_date);
+            params.append('start_date', dateRange.start);
+            params.append('end_date', dateRange.end);
 
             const response = await fetch(`/admin/api/reports/prescriptions?${params}`);
             const data = await response.json();
             if (data.success) {
                 setPrescriptionStats(data.report);
+            } else {
+                setError(data.message || 'Failed to fetch prescription stats');
             }
         } catch (error) {
             console.error('Error fetching prescription stats:', error);
+            setError('Network error: Unable to fetch prescription stats');
         } finally {
             setLoading(false);
         }
@@ -150,6 +243,68 @@ export default function ReportsIndex() {
         });
     };
 
+    const handlePeriodChange = (period) => {
+        const dateRange = getDateRange(period);
+        setFilters(prev => ({
+            ...prev,
+            period,
+            start_date: dateRange.start,
+            end_date: dateRange.end
+        }));
+    };
+
+    const renderPeriodFilter = () => (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+            <label className="text-sm font-semibold text-gray-700 mb-2 block">Period</label>
+            <div className="flex gap-3 flex-wrap mb-4">
+                {['today', 'week', 'month', 'year', 'custom'].map(period => (
+                    <button
+                        key={period}
+                        onClick={() => handlePeriodChange(period)}
+                        className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.period === period
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                    >
+                        {period === 'today' ? 'Today' :
+                            period === 'week' ? 'This Week' :
+                                period === 'month' ? 'This Month' :
+                                    period === 'year' ? 'This Year' :
+                                        'Custom Range'}
+                    </button>
+                ))}
+            </div>
+
+            {filters.period === 'custom' && (
+                <div className="flex gap-3 flex-wrap">
+                    <input
+                        type="date"
+                        value={filters.start_date}
+                        onChange={(e) => setFilters(prev => ({ ...prev, start_date: e.target.value }))}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                    />
+                    <input
+                        type="date"
+                        value={filters.end_date}
+                        onChange={(e) => setFilters(prev => ({ ...prev, end_date: e.target.value }))}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                    />
+                    <button
+                        onClick={() => {
+                            if (activeTab === 'sales') fetchSalesReport();
+                            else if (activeTab === 'top-products') fetchTopProducts();
+                            else if (activeTab === 'prescriptions') fetchPrescriptionStats();
+                        }}
+                        disabled={loading}
+                        className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {loading ? 'Loading...' : 'Apply'}
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+
     return (
         <AuthenticatedLayout>
             <Head title="Reports & Analytics" />
@@ -160,18 +315,27 @@ export default function ReportsIndex() {
                     <p className="text-gray-600">Comprehensive business insights and statistics</p>
                 </div>
 
+                {/* Error Message */}
+                {error && (
+                    <div className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4">
+                        <p className="text-red-800 font-medium">{error}</p>
+                    </div>
+                )}
+
                 {/* Tabs */}
                 <div className="bg-white rounded-2xl border border-gray-200 mb-6 shadow-sm overflow-x-auto">
                     <div className="flex border-b border-gray-200">
                         {['dashboard', 'sales', 'inventory', 'top-products', 'expiring', 'prescriptions'].map(tab => (
                             <button
                                 key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={`px-6 py-4 font-semibold transition-colors whitespace-nowrap ${
-                                    activeTab === tab
+                                onClick={() => {
+                                    setActiveTab(tab);
+                                    setError(null);
+                                }}
+                                className={`px-6 py-4 font-semibold transition-colors whitespace-nowrap ${activeTab === tab
                                         ? 'border-b-2 border-indigo-600 text-indigo-600'
                                         : 'text-gray-600 hover:text-gray-900'
-                                }`}
+                                    }`}
                             >
                                 {tab.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                             </button>
@@ -182,24 +346,7 @@ export default function ReportsIndex() {
                 {/* Dashboard Tab */}
                 {activeTab === 'dashboard' && (
                     <div className="space-y-6">
-                        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                            <label className="text-sm font-semibold text-gray-700 mb-2 block">Period</label>
-                            <div className="flex gap-3 flex-wrap">
-                                {['today', 'week', 'month', 'year'].map(period => (
-                                    <button
-                                        key={period}
-                                        onClick={() => setFilters(prev => ({ ...prev, period }))}
-                                        className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                                            filters.period === period
-                                                ? 'bg-indigo-600 text-white'
-                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                        }`}
-                                    >
-                                        {period.charAt(0).toUpperCase() + period.slice(1)}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                        {renderPeriodFilter()}
 
                         {loading ? (
                             <div className="flex items-center justify-center py-20">
@@ -293,67 +440,69 @@ export default function ReportsIndex() {
                 {/* Sales Report Tab */}
                 {activeTab === 'sales' && (
                     <div className="space-y-6">
-                        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                            <label className="text-sm font-semibold text-gray-700 mb-2 block">Date Range</label>
-                            <div className="flex gap-3">
-                                <input
-                                    type="date"
-                                    value={filters.start_date}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, start_date: e.target.value }))}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
-                                />
-                                <input
-                                    type="date"
-                                    value={filters.end_date}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, end_date: e.target.value }))}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
-                                />
-                                <button
-                                    onClick={fetchSalesReport}
-                                    className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700"
-                                >
-                                    Generate
-                                </button>
-                            </div>
-                        </div>
+                        {renderPeriodFilter()}
 
                         {loading ? (
                             <div className="flex items-center justify-center py-20">
                                 <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                             </div>
-                        ) : salesReport && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                                    <h3 className="text-lg font-bold text-gray-900 mb-4">Summary</h3>
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Total Revenue</span>
-                                            <span className="font-bold text-indigo-600">{formatCurrency(salesReport.total_revenue)}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Total Transactions</span>
-                                            <span className="font-semibold">{salesReport.total_transactions}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Average Transaction</span>
-                                            <span className="font-semibold">{formatCurrency(salesReport.average_transaction)}</span>
-                                        </div>
+                        ) : salesReport ? (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                                        <p className="text-sm font-medium text-gray-600 mb-2">Total Revenue</p>
+                                        <p className="text-3xl font-bold text-indigo-600">{formatCurrency(salesReport.total_revenue)}</p>
+                                    </div>
+                                    <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                                        <p className="text-sm font-medium text-gray-600 mb-2">Total Transactions</p>
+                                        <p className="text-3xl font-bold text-gray-900">{salesReport.total_transactions}</p>
+                                    </div>
+                                    <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                                        <p className="text-sm font-medium text-gray-600 mb-2">Average Transaction</p>
+                                        <p className="text-3xl font-bold text-gray-900">{formatCurrency(salesReport.average_transaction)}</p>
                                     </div>
                                 </div>
 
-                                <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                                    <h3 className="text-lg font-bold text-gray-900 mb-4">By Source</h3>
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">POS Revenue</span>
-                                            <span className="font-semibold text-green-600">{formatCurrency(salesReport.pos_revenue)}</span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                                        <h3 className="text-lg font-bold text-gray-900 mb-4">Revenue by Source</h3>
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-600">POS Revenue</span>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-green-600">{formatCurrency(salesReport.pos_revenue)}</p>
+                                                    <p className="text-xs text-gray-500">{salesReport.pos_transactions} transactions</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-600">Online Orders</span>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-blue-600">{formatCurrency(salesReport.orders_revenue)}</p>
+                                                    <p className="text-xs text-gray-500">{salesReport.online_orders} orders</p>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Orders Revenue</span>
-                                            <span className="font-semibold text-blue-600">{formatCurrency(salesReport.orders_revenue)}</span>
+                                    </div>
+
+                                    <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                                        <h3 className="text-lg font-bold text-gray-900 mb-4">Sales by Date</h3>
+                                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                                            {Object.entries(salesReport.sales_by_date || {}).map(([date, data]) => (
+                                                <div key={date} className="flex justify-between items-center py-2 border-b border-gray-100">
+                                                    <span className="text-sm text-gray-600">{date}</span>
+                                                    <div className="text-right">
+                                                        <p className="font-semibold text-gray-900">{formatCurrency(data.total)}</p>
+                                                        <p className="text-xs text-gray-500">{data.count} transactions</p>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
+                            </>
+                        ) : (
+                            <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+                                <p className="text-gray-500">Loading sales data...</p>
                             </div>
                         )}
                     </div>
@@ -369,11 +518,10 @@ export default function ReportsIndex() {
                                     <button
                                         key={type}
                                         onClick={() => setFilters(prev => ({ ...prev, inventory_type: type }))}
-                                        className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                                            filters.inventory_type === type
+                                        className={`px-4 py-2 rounded-xl font-medium transition-all ${filters.inventory_type === type
                                                 ? 'bg-indigo-600 text-white'
                                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                        }`}
+                                            }`}
                                     >
                                         {type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                                     </button>
@@ -418,25 +566,33 @@ export default function ReportsIndex() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-200">
-                                                {inventoryReport.products?.map(product => (
-                                                    <tr key={product._id} className="hover:bg-gray-50">
-                                                        <td className="px-6 py-4">
-                                                            <p className="font-medium text-gray-900">{product.product_name}</p>
-                                                            <p className="text-sm text-gray-600">{product.product_code}</p>
-                                                        </td>
-                                                        <td className="px-6 py-4 font-semibold">{product.stock_quantity}</td>
-                                                        <td className="px-6 py-4">{product.reorder_level}</td>
-                                                        <td className="px-6 py-4">
-                                                            {product.stock_quantity <= 0 ? (
-                                                                <span className="px-3 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">Out of Stock</span>
-                                                            ) : product.stock_quantity <= product.reorder_level ? (
-                                                                <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">Low Stock</span>
-                                                            ) : (
-                                                                <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">In Stock</span>
-                                                            )}
+                                                {inventoryReport.products?.length > 0 ? (
+                                                    inventoryReport.products.map(product => (
+                                                        <tr key={product._id} className="hover:bg-gray-50">
+                                                            <td className="px-6 py-4">
+                                                                <p className="font-medium text-gray-900">{product.product_name}</p>
+                                                                <p className="text-sm text-gray-600">{product.product_code}</p>
+                                                            </td>
+                                                            <td className="px-6 py-4 font-semibold">{product.stock_quantity}</td>
+                                                            <td className="px-6 py-4">{product.reorder_level}</td>
+                                                            <td className="px-6 py-4">
+                                                                {product.stock_quantity <= 0 ? (
+                                                                    <span className="px-3 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">Out of Stock</span>
+                                                                ) : product.stock_quantity <= product.reorder_level ? (
+                                                                    <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">Low Stock</span>
+                                                                ) : (
+                                                                    <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">In Stock</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
+                                                            No products found
                                                         </td>
                                                     </tr>
-                                                ))}
+                                                )}
                                             </tbody>
                                         </table>
                                     </div>
@@ -449,35 +605,13 @@ export default function ReportsIndex() {
                 {/* Top Products Tab */}
                 {activeTab === 'top-products' && (
                     <div className="space-y-6">
-                        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                            <label className="text-sm font-semibold text-gray-700 mb-2 block">Date Range</label>
-                            <div className="flex gap-3">
-                                <input
-                                    type="date"
-                                    value={filters.start_date}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, start_date: e.target.value }))}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
-                                />
-                                <input
-                                    type="date"
-                                    value={filters.end_date}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, end_date: e.target.value }))}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
-                                />
-                                <button
-                                    onClick={fetchTopProducts}
-                                    className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700"
-                                >
-                                    Generate
-                                </button>
-                            </div>
-                        </div>
+                        {renderPeriodFilter()}
 
                         {loading ? (
                             <div className="flex items-center justify-center py-20">
                                 <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                             </div>
-                        ) : (
+                        ) : topProducts.length > 0 ? (
                             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
@@ -487,6 +621,7 @@ export default function ReportsIndex() {
                                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Product</th>
                                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Units Sold</th>
                                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Transactions</th>
+                                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Revenue</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200">
@@ -501,11 +636,16 @@ export default function ReportsIndex() {
                                                     </td>
                                                     <td className="px-6 py-4 font-semibold text-lg">{item.total_quantity}</td>
                                                     <td className="px-6 py-4">{item.transaction_count}</td>
+                                                    <td className="px-6 py-4 font-semibold text-green-600">{formatCurrency(item.total_revenue)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+                                <p className="text-gray-500">Loading top products...</p>
                             </div>
                         )}
                     </div>
@@ -535,7 +675,7 @@ export default function ReportsIndex() {
                             <div className="flex items-center justify-center py-20">
                                 <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                             </div>
-                        ) : (
+                        ) : expiringProducts.length > 0 ? (
                             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                                 <div className="p-6 border-b border-gray-200">
                                     <h3 className="text-lg font-bold text-gray-900">Products expiring within {filters.expiring_days} days</h3>
@@ -569,11 +709,10 @@ export default function ReportsIndex() {
                                                             {(() => {
                                                                 const daysLeft = Math.ceil((new Date(batch.expiration_date) - new Date()) / (1000 * 60 * 60 * 24));
                                                                 return (
-                                                                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                                                        daysLeft <= 7 ? 'bg-red-100 text-red-800' :
-                                                                        daysLeft <= 14 ? 'bg-orange-100 text-orange-800' :
-                                                                        'bg-yellow-100 text-yellow-800'
-                                                                    }`}>
+                                                                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${daysLeft <= 7 ? 'bg-red-100 text-red-800' :
+                                                                            daysLeft <= 14 ? 'bg-orange-100 text-orange-800' :
+                                                                                'bg-yellow-100 text-yellow-800'
+                                                                        }`}>
                                                                         {daysLeft} days
                                                                     </span>
                                                                 );
@@ -586,6 +725,10 @@ export default function ReportsIndex() {
                                     </table>
                                 </div>
                             </div>
+                        ) : (
+                            <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+                                <p className="text-gray-500">No products expiring within {filters.expiring_days} days</p>
+                            </div>
                         )}
                     </div>
                 )}
@@ -593,29 +736,7 @@ export default function ReportsIndex() {
                 {/* Prescriptions Tab */}
                 {activeTab === 'prescriptions' && (
                     <div className="space-y-6">
-                        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                            <label className="text-sm font-semibold text-gray-700 mb-2 block">Date Range (Optional)</label>
-                            <div className="flex gap-3">
-                                <input
-                                    type="date"
-                                    value={filters.start_date}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, start_date: e.target.value }))}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
-                                />
-                                <input
-                                    type="date"
-                                    value={filters.end_date}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, end_date: e.target.value }))}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
-                                />
-                                <button
-                                    onClick={fetchPrescriptionStats}
-                                    className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700"
-                                >
-                                    Generate
-                                </button>
-                            </div>
-                        </div>
+                        {renderPeriodFilter()}
 
                         {loading ? (
                             <div className="flex items-center justify-center py-20">
